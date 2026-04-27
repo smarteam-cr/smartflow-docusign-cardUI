@@ -1,0 +1,12 @@
+{
+  "uid": "docusing_integration_card",
+  "type": "card",
+  "config": {
+    "name": "Firmas Docusing (dfer)",
+    "location": "crm.record.sidebar",
+    "entrypoint": "/app/cards/NewCard.tsx",
+    "objectTypes": [
+      "deals"
+    ]
+  }
+}
