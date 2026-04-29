@@ -198,11 +198,11 @@ IMPORTANT: IF THE 'HubSpotDev' MCP SERVER IS INSTALLED USE THE TOOLS BEFORE TRYI
 
 ## Qué hace esta card
 
-Card en el sidebar del registro de **Deal** que permite enviar un documento DocuSign al **primer contacto asociado** del Deal:
+Card en el sidebar del registro de **Deal** que permite enviar un documento DocuSign a un contacto asociado del Deal, elegido explícitamente por el usuario:
 
-1. Al cargar: `GET /api/v1/docusign/templates` al backend → lista de Templates DocuSign → poblar `<Select>`.
-2. Usuario selecciona un Template → click "Enviar".
-3. `POST /api/v1/docusign/envelopes` con `{ dealId, templateId }` → backend resuelve contacto y envía envelope.
+1. Al cargar: en paralelo `GET /api/v1/docusign/templates` y `GET /api/v1/hubspot/deals/:id/contacts` → poblar ambos dropdowns.
+2. Usuario selecciona un Template Y un Contacto → click "Enviar".
+3. `POST /api/v1/docusign/envelopes` con `{ dealId, templateId, contactId }` → backend valida pertenencia y envía envelope al contacto elegido.
 4. La card muestra confirmación con el email del destinatario, o el error correspondiente.
 
 ---
@@ -239,11 +239,30 @@ local.json                 ← proxy config (dev) — NO se commitea si tiene in
 ```ts
 type UiState =
   | { kind: 'loading' }
-  | { kind: 'ready';      templates: Template[]; selected: string | null }
-  | { kind: 'loadError';  message: string }
-  | { kind: 'sending';    templates: Template[]; selected: string }
-  | { kind: 'success';    recipientEmail: string }
-  | { kind: 'sendError';  templates: Template[]; selected: string; message: string };
+  | {
+      kind: 'ready';
+      templates: Template[];
+      contacts: Contact[];
+      selectedTemplateId: string | null;
+      selectedContactId: string | null;
+    }
+  | { kind: 'loadError'; message: string }
+  | {
+      kind: 'sending';
+      templates: Template[];
+      contacts: Contact[];
+      selectedTemplateId: string;
+      selectedContactId: string;
+    }
+  | { kind: 'success'; recipientEmail: string }
+  | {
+      kind: 'sendError';
+      templates: Template[];
+      contacts: Contact[];
+      selectedTemplateId: string;
+      selectedContactId: string;
+      message: string;
+    };
 ```
 
 TypeScript garantiza que en cada estado solo accedes a las propiedades válidas. **No renderices estados que no existan en este tipo.** Si necesitas un estado nuevo, añádelo aquí — TS te guiará por todos los lugares que tienen que cambiar.
