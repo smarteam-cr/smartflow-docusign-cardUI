@@ -1,13 +1,12 @@
 import { hubspot } from '@hubspot/ui-extensions';
-import type { Template, SendEnvelopeResult } from '../types.js';
+import type { Contact, Template, SendEnvelopeResult } from '../types.js';
 
 /**
  * Dummy HTTPS URL that the HubSpot CLI proxies to http://localhost:3000 in dev
- * (via local.json). In production this constant gets replaced with the real
- * backend domain — see deployment notes in card CLAUDE.md.
+ * (via local.json in src/app/). In production this constant is replaced with
+ * the real backend domain.
  *
- * MUST stay listed in app-hsmeta.json's permittedUrls.fetch — HubSpot rejects
- * fetches to URLs not whitelisted there.
+ * MUST stay listed in app-hsmeta.json's permittedUrls.fetch.
  */
 const API_BASE = 'https://api.docusign-integration.local';
 
@@ -46,18 +45,37 @@ export async function fetchTemplates(): Promise<Template[]> {
 }
 
 /**
+ * GET /api/v1/hubspot/deals/:dealId/contacts → contacts associated to the Deal.
+ * @throws Error with a user-friendly message on failure.
+ */
+export async function fetchContacts(dealId: string): Promise<Contact[]> {
+  const res = await hubspot.fetch(
+    `${API_BASE}/api/v1/hubspot/deals/${encodeURIComponent(dealId)}/contacts`,
+    { method: 'GET' }
+  );
+
+  if (!res.ok) {
+    const msg = await extractErrorMessage(res, 'No pudimos cargar los contactos del Deal');
+    throw new Error(msg);
+  }
+
+  const body = (await res.json()) as { contacts?: Contact[] };
+  return body.contacts ?? [];
+}
+
+/**
  * POST /api/v1/docusign/envelopes → triggers backend to send a DocuSign envelope
- * to the first contact associated to the given Deal, using the given template.
+ * to the chosen contact, using the chosen template.
  * @throws Error with a user-friendly message on failure.
  */
 export async function sendEnvelope(input: {
   dealId: string;
   templateId: string;
+  contactId: string;
 }): Promise<SendEnvelopeResult> {
   const res = await hubspot.fetch(`${API_BASE}/api/v1/docusign/envelopes`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(input),
+    body: input,
   });
 
   if (!res.ok) {

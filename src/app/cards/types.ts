@@ -7,6 +7,17 @@ export interface Template {
 }
 
 /**
+ * A HubSpot contact associated to the Deal, as returned by
+ * GET /api/v1/hubspot/deals/:dealId/contacts.
+ */
+export interface Contact {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+}
+
+/**
  * Result of POST /api/v1/docusign/envelopes.
  */
 export interface SendEnvelopeResult {
@@ -29,8 +40,27 @@ export interface SendEnvelopeResult {
  */
 export type UiState =
   | { kind: 'loading' }
-  | { kind: 'ready'; templates: Template[]; selected: string | null }
+  | {
+      kind: 'ready';
+      templates: Template[];
+      contacts: Contact[];
+      selectedTemplateId: string | null;
+      selectedContactId: string | null;
+    }
   | { kind: 'loadError'; message: string }
-  | { kind: 'sending'; templates: Template[]; selected: string }
+  | {
+      kind: 'sending';
+      templates: Template[];
+      contacts: Contact[];
+      selectedTemplateId: string;
+      selectedContactId: string;
+    }
   | { kind: 'success'; recipientEmail: string }
-  | { kind: 'sendError'; templates: Template[]; selected: string; message: string };
+  | {
+      kind: 'sendError';
+      templates: Template[];
+      contacts: Contact[];
+      selectedTemplateId: string;
+      selectedContactId: string;
+      message: string;
+    };
