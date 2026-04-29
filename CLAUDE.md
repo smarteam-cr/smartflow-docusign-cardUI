@@ -289,7 +289,7 @@ export async function fetchTemplates(): Promise<Template[]> {
 
 HubSpot exige HTTPS válido aquí — **no acepta `localhost`.** Por eso usamos un dominio dummy.
 
-**2. `local.json`** (junto a `card-hsmeta.json` en `src/app/cards/`):
+**2. `local.json`** (junto a `app-hsmeta.json` en `src/app/`, **no** en `src/app/cards/` — la doc oficial de HubSpot exige que esté al lado del `*-hsmeta.json` del app):
 
 ```json
 {
