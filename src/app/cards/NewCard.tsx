@@ -131,7 +131,6 @@ const Extension: React.FC<ExtensionProps> = ({ context }) => {
 
   return (
     <Flex direction="column" gap="medium">
-      <Text format={{ fontWeight: 'bold' }}>Firmas DocuSign</Text>
 
       {state.kind === 'loading' && (
         <Flex direction="column" align="center" gap="small">
