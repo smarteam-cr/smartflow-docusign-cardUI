@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { hubspot, Flex, LoadingSpinner, Text, Button } from '@hubspot/ui-extensions';
-import { fetchTemplates, fetchContacts, sendEnvelope, fetchEnvelopeStatus } from './api/client.js';
+import { hubspot, Flex, LoadingSpinner, Text, Button, Modal, ModalBody, ModalFooter, Input } from '@hubspot/ui-extensions';
+import { fetchTemplates, fetchContacts, sendEnvelope, fetchEnvelopeStatus, voidEnvelope } from './api/client.js';
 import { TemplateSelector } from './components/TemplateSelector.js';
 import { ContactSelector } from './components/ContactSelector.js';
 import { SendButton } from './components/SendButton.js';
@@ -10,10 +10,11 @@ import type { UiState, Template, Contact, EnvelopeStatus } from './types.js';
 function resolveInitialState(
   templates: Template[],
   contacts: Contact[],
-  status: EnvelopeStatus
+  status: EnvelopeStatus,
+  dealId: string
 ): UiState {
   if (status.status === 'sent' || status.status === 'signing') {
-    return { kind: 'active', envelopeId: status.envelopeId!, status: status.status, sentAt: status.sentAt };
+    return { kind: 'active', envelopeId: status.envelopeId!, dealId, status: status.status, sentAt: status.sentAt };
   }
   if (status.status === 'signed') {
     return { kind: 'signed', envelopeId: status.envelopeId!, signedAt: status.signedAt, pdfUrl: status.pdfUrl };
@@ -37,12 +38,19 @@ interface ExtensionProps {
 const Extension: React.FC<ExtensionProps> = ({ context }) => {
   const dealId = String(context.crm.objectId);
   const [state, setState] = useState<UiState>({ kind: 'loading' });
+  const [cancelModal, setCancelModal] = useState<{
+    reason: string;
+    submitting: boolean;
+    error: string | null;
+  }>({ reason: '', submitting: false, error: null });
+
+  const resetCancelModal = () => setCancelModal({ reason: '', submitting: false, error: null });
 
   const loadAll = (): void => {
     setState({ kind: 'loading' });
     Promise.all([fetchTemplates(), fetchContacts(dealId), fetchEnvelopeStatus(dealId)])
       .then(([templates, contacts, envelopeStatus]) => {
-        setState(resolveInitialState(templates, contacts, envelopeStatus));
+        setState(resolveInitialState(templates, contacts, envelopeStatus, dealId));
       })
       .catch((err: Error) => setState({ kind: 'loadError', message: err.message }));
   };
@@ -62,7 +70,7 @@ const Extension: React.FC<ExtensionProps> = ({ context }) => {
     Promise.all([fetchTemplates(), fetchContacts(dealId), fetchEnvelopeStatus(dealId)])
       .then(([templates, contacts, envelopeStatus]) => {
         if (cancelled) return;
-        setState(resolveInitialState(templates, contacts, envelopeStatus));
+        setState(resolveInitialState(templates, contacts, envelopeStatus, dealId));
       })
       .catch((err: Error) => {
         if (!cancelled) setState({ kind: 'loadError', message: err.message });
@@ -131,6 +139,7 @@ const Extension: React.FC<ExtensionProps> = ({ context }) => {
       setState({
         kind: 'active',
         envelopeId: result.envelopeId,
+        dealId,
         status: 'sent',
         sentAt: new Date().toISOString().split('T')[0]!,
       });
@@ -147,6 +156,28 @@ const Extension: React.FC<ExtensionProps> = ({ context }) => {
     }
   };
 
+  const handleSubmitCancel = async (_event: unknown, reactions: { closeModal: (id: string) => void }): Promise<void> => {
+    if (state.kind !== 'active') return;
+    if (cancelModal.reason.trim().length < 5) {
+      setCancelModal({ ...cancelModal, error: 'La razon debe tener al menos 5 caracteres' });
+      return;
+    }
+    setCancelModal({ ...cancelModal, submitting: true, error: null });
+    try {
+      await voidEnvelope({
+        envelopeId: state.envelopeId,
+        dealId: state.dealId,
+        reason: cancelModal.reason.trim(),
+      });
+      reactions.closeModal('cancel-contract-modal');
+      resetCancelModal();
+      setState({ kind: 'failed', envelopeId: state.envelopeId, status: 'voided' });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Error desconocido';
+      setCancelModal({ ...cancelModal, submitting: false, error: message });
+    }
+  };
+
   const handleRefresh = (): void => {
     setState({ kind: 'loading' });
     fetchEnvelopeStatus(dealId)
@@ -156,7 +187,7 @@ const Extension: React.FC<ExtensionProps> = ({ context }) => {
         } else if (['declined', 'voided', 'expired'].includes(status.status)) {
           setState({ kind: 'failed', envelopeId: status.envelopeId!, status: status.status });
         } else {
-          setState({ kind: 'active', envelopeId: status.envelopeId!, status: status.status, sentAt: status.sentAt });
+          setState({ kind: 'active', envelopeId: status.envelopeId!, dealId, status: status.status, sentAt: status.sentAt });
         }
       })
       .catch((err: Error) => setState({ kind: 'loadError', message: err.message }));
@@ -238,7 +269,51 @@ const Extension: React.FC<ExtensionProps> = ({ context }) => {
             <Text>Estado: {state.status === 'sent' ? 'Enviado' : 'En firma'}</Text>
             {state.sentAt && <Text>Enviado: {state.sentAt}</Text>}
           </StatusMessage>
-          <SendButton disabled={false} loading={false} onClick={handleRefresh} label="Refrescar estado" />
+          <Flex direction="row" gap="small">
+            <SendButton disabled={false} loading={false} onClick={handleRefresh} label="Refrescar estado" />
+            <Button
+              variant="destructive"
+              onClick={resetCancelModal}
+              overlay={
+                <Modal
+                  id="cancel-contract-modal"
+                  title="Cancelar contrato"
+                  variant="danger"
+                  onClose={resetCancelModal}
+                >
+                  <ModalBody>
+                    <Flex direction="column" gap="small">
+                      <Text>Esta accion no se puede deshacer. El contrato sera cancelado en DocuSign.</Text>
+                      <Input
+                        label="Razon de cancelacion"
+                        name="cancel-reason"
+                        value={cancelModal.reason}
+                        onChange={(v) => setCancelModal({ ...cancelModal, reason: String(v), error: null })}
+                        readOnly={cancelModal.submitting}
+                        placeholder="Minimo 5 caracteres"
+                      />
+                      {cancelModal.error && (
+                        <StatusMessage variant="danger" title="Error">
+                          <Text>{cancelModal.error}</Text>
+                        </StatusMessage>
+                      )}
+                    </Flex>
+                  </ModalBody>
+                  <ModalFooter>
+                    <Button
+                      variant="destructive"
+                      onClick={handleSubmitCancel}
+                      disabled={cancelModal.submitting || cancelModal.reason.trim().length < 5}
+                    >
+                      {cancelModal.submitting ? 'Cancelando...' : 'Si, cancelar'}
+                    </Button>
+                  </ModalFooter>
+                </Modal>
+              }
+            >
+              Cancelar contrato
+            </Button>
+          </Flex>
         </Flex>
       )}
 
