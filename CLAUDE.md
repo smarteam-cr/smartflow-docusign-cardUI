@@ -335,24 +335,33 @@ hubspot.extend<'crm.record.tab'>(({ context }) => {
 
 ---
 
-## Demo vs Roadmap (frontend)
+## Estado actual vs Plan 12 (frontend)
 
-**En demo (construir hoy):**
-- ✅ Lista templates con `<Select>`, botón "Enviar", mensajes success/error
-- ✅ State machine de 5 estados
+**Implementado (v1 — rama main):**
+- ✅ Lista templates con `<Select>`
+- ✅ Selección de contacto con dropdown (`ContactSelector`)
+- ✅ Botón "Enviar" con state machine (loading, ready, sending, success, error)
 - ✅ Solo castellano hardcoded
 
-**Roadmap (no implementar hasta que toque):**
+**Plan 12 — F6 Card UI completa (rama `v2-grupo-inve`, próximo plan):**
+- Jurídico auto vs dropdown: si hay 1 contacto con label `responsable_jurídico` → banner auto, sin dropdown; si hay 0 → dropdown normal; si >1 → error
+- Dropdown de direcciones de la empresa asociada (usa `directionId` opcional del backend)
+- Vistas por estado lifecycle: ACTIVE (sent/signing) con botón "Cancelar" + "Refrescar", SIGNED con "Ver PDF" + "Nuevo contrato", FAILED (declined/voided/expired) con "Nuevo contrato"
+- Modal de confirmación antes de enviar (resumen de firmantes + template + empresa)
+- Modal de cancelación (razón obligatoria min 5 chars)
+- Indicador "✓ Cotización vinculada" / "✓ N capex incluidos"
+- Endpoint `GET /deals/:dealId/envelope-status` para estado actual
+- Endpoint `POST /envelopes/:envelopeId/void` para cancelar
+
+**Roadmap (post-v2):**
 - React Query (cache, retry, optimistic UI)
 - Search/filter en lista de templates
-- Estado del envelope post-envío (`delivered`, `signed`) vía polling o webhooks
-- Historial de envelopes del Deal
-- Selección de contacto entre los asociados al Deal
-- Settings page para configurar mappings de tabLabels por template
+- Historial de envelopes del Deal (múltiples Notes en timeline)
+- Settings page para configurar mappings por template
 - i18n con `react-intl` (es-ES, en-US)
 - Auditoría de a11y con `axe-core`
 
-Lista completa y actualizada en spec §15.8.
+Spec completo en `docs/specs/2026-05-13-grupo-inve-v2-consolidated-design.md` §8 (F6 Card UI).
 
 ---
 

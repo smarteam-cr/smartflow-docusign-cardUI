@@ -38,12 +38,20 @@ const Extension: React.FC<ExtensionProps> = ({ context }) => {
   const dealId = String(context.crm.objectId);
   const [state, setState] = useState<UiState>({ kind: 'loading' });
 
-  // Used by user-initiated retries (after loadError) and "Nuevo contrato" from terminal states.
   const loadAll = (): void => {
     setState({ kind: 'loading' });
     Promise.all([fetchTemplates(), fetchContacts(dealId), fetchEnvelopeStatus(dealId)])
       .then(([templates, contacts, envelopeStatus]) => {
         setState(resolveInitialState(templates, contacts, envelopeStatus));
+      })
+      .catch((err: Error) => setState({ kind: 'loadError', message: err.message }));
+  };
+
+  const loadForNewContract = (): void => {
+    setState({ kind: 'loading' });
+    Promise.all([fetchTemplates(), fetchContacts(dealId)])
+      .then(([templates, contacts]) => {
+        setState({ kind: 'ready', templates, contacts, selectedTemplateId: null, selectedContactId: null });
       })
       .catch((err: Error) => setState({ kind: 'loadError', message: err.message }));
   };
@@ -242,7 +250,7 @@ const Extension: React.FC<ExtensionProps> = ({ context }) => {
           {state.pdfUrl && (
             <Button href={{ url: state.pdfUrl, external: true }} variant="secondary">Ver contrato firmado</Button>
           )}
-          <SendButton disabled={false} loading={false} onClick={loadAll} label="Nuevo contrato" />
+          <SendButton disabled={false} loading={false} onClick={loadForNewContract} label="Nuevo contrato" />
         </Flex>
       )}
 
@@ -255,7 +263,7 @@ const Extension: React.FC<ExtensionProps> = ({ context }) => {
           }>
             <Text>El contrato anterior fue {state.status === 'declined' ? 'rechazado por un firmante' : state.status === 'voided' ? 'cancelado' : 'expirado sin firmar'}.</Text>
           </StatusMessage>
-          <SendButton disabled={false} loading={false} onClick={loadAll} label="Nuevo contrato" />
+          <SendButton disabled={false} loading={false} onClick={loadForNewContract} label="Nuevo contrato" />
         </Flex>
       )}
 
