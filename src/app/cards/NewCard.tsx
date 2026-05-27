@@ -246,6 +246,19 @@ const Extension: React.FC<ExtensionProps> = ({ context }) => {
         </Flex>
       )}
 
+      {state.kind === 'failed' && (
+        <Flex direction="column" gap="small">
+          <StatusMessage variant="danger" title={
+            state.status === 'declined' ? 'Contrato rechazado' :
+            state.status === 'voided' ? 'Contrato cancelado' :
+            'Contrato expirado'
+          }>
+            <Text>El contrato anterior fue {state.status === 'declined' ? 'rechazado por un firmante' : state.status === 'voided' ? 'cancelado' : 'expirado sin firmar'}.</Text>
+          </StatusMessage>
+          <SendButton disabled={false} loading={false} onClick={loadAll} label="Nuevo contrato" />
+        </Flex>
+      )}
+
       {state.kind === 'success' && (
         <Flex direction="column" gap="small">
           <StatusMessage variant="success" title="Documento enviado">
