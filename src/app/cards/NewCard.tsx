@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { hubspot, Flex, LoadingSpinner, Text } from '@hubspot/ui-extensions';
+import { hubspot, Flex, LoadingSpinner, Text, Button } from '@hubspot/ui-extensions';
 import { fetchTemplates, fetchContacts, sendEnvelope, fetchEnvelopeStatus } from './api/client.js';
 import { TemplateSelector } from './components/TemplateSelector.js';
 import { ContactSelector } from './components/ContactSelector.js';
@@ -231,6 +231,18 @@ const Extension: React.FC<ExtensionProps> = ({ context }) => {
             {state.sentAt && <Text>Enviado: {state.sentAt}</Text>}
           </StatusMessage>
           <SendButton disabled={false} loading={false} onClick={handleRefresh} label="Refrescar estado" />
+        </Flex>
+      )}
+
+      {state.kind === 'signed' && (
+        <Flex direction="column" gap="small">
+          <StatusMessage variant="success" title="Contrato firmado">
+            {state.signedAt && <Text>Firmado: {state.signedAt}</Text>}
+          </StatusMessage>
+          {state.pdfUrl && (
+            <Button href={{ url: state.pdfUrl, external: true }} variant="secondary">Ver contrato firmado</Button>
+          )}
+          <SendButton disabled={false} loading={false} onClick={loadAll} label="Nuevo contrato" />
         </Flex>
       )}
 
