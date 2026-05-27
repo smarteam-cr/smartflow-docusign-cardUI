@@ -38,7 +38,7 @@ const Extension: React.FC<ExtensionProps> = ({ context }) => {
   const dealId = String(context.crm.objectId);
   const [state, setState] = useState<UiState>({ kind: 'loading' });
 
-  // Used by user-initiated retries (after loadError or after a success "send another").
+  // Used by user-initiated retries (after loadError) and "Nuevo contrato" from terminal states.
   const loadAll = (): void => {
     setState({ kind: 'loading' });
     Promise.all([fetchTemplates(), fetchContacts(dealId), fetchEnvelopeStatus(dealId)])
@@ -259,19 +259,6 @@ const Extension: React.FC<ExtensionProps> = ({ context }) => {
         </Flex>
       )}
 
-      {state.kind === 'success' && (
-        <Flex direction="column" gap="small">
-          <StatusMessage variant="success" title="Documento enviado">
-            <Text>Se envió a: {state.recipientEmail}</Text>
-          </StatusMessage>
-          <SendButton
-            disabled={false}
-            loading={false}
-            onClick={loadAll}
-            label="Enviar otro documento"
-          />
-        </Flex>
-      )}
     </Flex>
   );
 };

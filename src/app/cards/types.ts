@@ -66,7 +66,6 @@ export type UiState =
       selectedTemplateId: string;
       selectedContactId: string;
     }
-  | { kind: 'success'; recipientEmail: string }
   | {
       kind: 'sendError';
       templates: Template[];
