@@ -1,5 +1,5 @@
 import { hubspot } from '@hubspot/ui-extensions';
-import type { Contact, Template, SendEnvelopeResult } from '../types.js';
+import type { Contact, Template, SendEnvelopeResult, EnvelopeStatus } from '../types.js';
 
 /**
  * Dummy HTTPS URL that the HubSpot CLI proxies to http://localhost:3000 in dev
@@ -84,4 +84,18 @@ export async function sendEnvelope(input: {
   }
 
   return (await res.json()) as SendEnvelopeResult;
+}
+
+export async function fetchEnvelopeStatus(dealId: string): Promise<EnvelopeStatus> {
+  const res = await hubspot.fetch(
+    `${API_BASE}/api/v1/deals/${encodeURIComponent(dealId)}/envelope-status`,
+    { method: 'GET' }
+  );
+
+  if (!res.ok) {
+    const msg = await extractErrorMessage(res, 'No pudimos cargar el estado del contrato');
+    throw new Error(msg);
+  }
+
+  return (await res.json()) as EnvelopeStatus;
 }
