@@ -77,6 +77,7 @@ export type UiState =
   | {
       kind: 'active';
       envelopeId: string;
+      dealId: string;
       status: string;
       sentAt: string | null;
     }

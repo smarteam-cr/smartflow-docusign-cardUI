@@ -86,6 +86,21 @@ export async function sendEnvelope(input: {
   return (await res.json()) as SendEnvelopeResult;
 }
 
+export async function voidEnvelope(input: {
+  envelopeId: string;
+  dealId: string;
+  reason: string;
+}): Promise<void> {
+  const res = await hubspot.fetch(
+    `${API_BASE}/api/v1/docusign/envelopes/${encodeURIComponent(input.envelopeId)}/void`,
+    { method: 'POST', body: { dealId: input.dealId, reason: input.reason } }
+  );
+  if (!res.ok) {
+    const msg = await extractErrorMessage(res, 'No se pudo cancelar el contrato');
+    throw new Error(msg);
+  }
+}
+
 export async function fetchEnvelopeStatus(dealId: string): Promise<EnvelopeStatus> {
   const res = await hubspot.fetch(
     `${API_BASE}/api/v1/deals/${encodeURIComponent(dealId)}/envelope-status`,
