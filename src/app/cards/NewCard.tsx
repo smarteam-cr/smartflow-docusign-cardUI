@@ -1,11 +1,28 @@
 import React, { useEffect, useState } from 'react';
 import { hubspot, Flex, LoadingSpinner, Text } from '@hubspot/ui-extensions';
-import { fetchTemplates, fetchContacts, sendEnvelope } from './api/client.js';
+import { fetchTemplates, fetchContacts, sendEnvelope, fetchEnvelopeStatus } from './api/client.js';
 import { TemplateSelector } from './components/TemplateSelector.js';
 import { ContactSelector } from './components/ContactSelector.js';
 import { SendButton } from './components/SendButton.js';
 import { StatusMessage } from './components/StatusMessage.js';
-import type { UiState } from './types.js';
+import type { UiState, Template, Contact, EnvelopeStatus } from './types.js';
+
+function resolveInitialState(
+  templates: Template[],
+  contacts: Contact[],
+  status: EnvelopeStatus
+): UiState {
+  if (status.status === 'sent' || status.status === 'signing') {
+    return { kind: 'active', envelopeId: status.envelopeId!, status: status.status, sentAt: status.sentAt };
+  }
+  if (status.status === 'signed') {
+    return { kind: 'signed', envelopeId: status.envelopeId!, signedAt: status.signedAt, pdfUrl: status.pdfUrl };
+  }
+  if (['declined', 'voided', 'expired'].includes(status.status)) {
+    return { kind: 'failed', envelopeId: status.envelopeId!, status: status.status };
+  }
+  return { kind: 'ready', templates, contacts, selectedTemplateId: null, selectedContactId: null };
+}
 
 hubspot.extend<'crm.record.tab'>(({ context }) => <Extension context={context} />);
 
@@ -24,15 +41,9 @@ const Extension: React.FC<ExtensionProps> = ({ context }) => {
   // Used by user-initiated retries (after loadError or after a success "send another").
   const loadAll = (): void => {
     setState({ kind: 'loading' });
-    Promise.all([fetchTemplates(), fetchContacts(dealId)])
-      .then(([templates, contacts]) => {
-        setState({
-          kind: 'ready',
-          templates,
-          contacts,
-          selectedTemplateId: null,
-          selectedContactId: null,
-        });
+    Promise.all([fetchTemplates(), fetchContacts(dealId), fetchEnvelopeStatus(dealId)])
+      .then(([templates, contacts, envelopeStatus]) => {
+        setState(resolveInitialState(templates, contacts, envelopeStatus));
       })
       .catch((err: Error) => setState({ kind: 'loadError', message: err.message }));
   };
@@ -40,16 +51,10 @@ const Extension: React.FC<ExtensionProps> = ({ context }) => {
   // Initial load on mount, with cancelled flag in case user closes the card mid-fetch.
   useEffect(() => {
     let cancelled = false;
-    Promise.all([fetchTemplates(), fetchContacts(dealId)])
-      .then(([templates, contacts]) => {
+    Promise.all([fetchTemplates(), fetchContacts(dealId), fetchEnvelopeStatus(dealId)])
+      .then(([templates, contacts, envelopeStatus]) => {
         if (cancelled) return;
-        setState({
-          kind: 'ready',
-          templates,
-          contacts,
-          selectedTemplateId: null,
-          selectedContactId: null,
-        });
+        setState(resolveInitialState(templates, contacts, envelopeStatus));
       })
       .catch((err: Error) => {
         if (!cancelled) setState({ kind: 'loadError', message: err.message });
@@ -115,7 +120,12 @@ const Extension: React.FC<ExtensionProps> = ({ context }) => {
         templateId: selectedTemplateId,
         contactId: selectedContactId,
       });
-      setState({ kind: 'success', recipientEmail: result.recipientEmail });
+      setState({
+        kind: 'active',
+        envelopeId: result.envelopeId,
+        status: 'sent',
+        sentAt: new Date().toISOString().split('T')[0]!,
+      });
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Error desconocido';
       setState({
