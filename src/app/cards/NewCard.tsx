@@ -139,6 +139,21 @@ const Extension: React.FC<ExtensionProps> = ({ context }) => {
     }
   };
 
+  const handleRefresh = (): void => {
+    setState({ kind: 'loading' });
+    fetchEnvelopeStatus(dealId)
+      .then((status) => {
+        if (status.status === 'signed') {
+          setState({ kind: 'signed', envelopeId: status.envelopeId!, signedAt: status.signedAt, pdfUrl: status.pdfUrl });
+        } else if (['declined', 'voided', 'expired'].includes(status.status)) {
+          setState({ kind: 'failed', envelopeId: status.envelopeId!, status: status.status });
+        } else {
+          setState({ kind: 'active', envelopeId: status.envelopeId!, status: status.status, sentAt: status.sentAt });
+        }
+      })
+      .catch((err: Error) => setState({ kind: 'loadError', message: err.message }));
+  };
+
   return (
     <Flex direction="column" gap="medium">
 
@@ -206,6 +221,16 @@ const Extension: React.FC<ExtensionProps> = ({ context }) => {
               <Text>{state.message}</Text>
             </StatusMessage>
           )}
+        </Flex>
+      )}
+
+      {state.kind === 'active' && (
+        <Flex direction="column" gap="small">
+          <StatusMessage variant="info" title="Contrato en proceso">
+            <Text>Estado: {state.status === 'sent' ? 'Enviado' : 'En firma'}</Text>
+            {state.sentAt && <Text>Enviado: {state.sentAt}</Text>}
+          </StatusMessage>
+          <SendButton disabled={false} loading={false} onClick={handleRefresh} label="Refrescar estado" />
         </Flex>
       )}
 
