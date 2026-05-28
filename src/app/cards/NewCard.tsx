@@ -47,9 +47,10 @@ const Extension: React.FC<ExtensionProps> = ({ context, actions }) => {
     reason: string;
     submitting: boolean;
     error: string | null;
-  }>({ reason: '', submitting: false, error: null });
+    voidedEnvelopeId: string | null;
+  }>({ reason: '', submitting: false, error: null, voidedEnvelopeId: null });
 
-  const resetCancelModal = () => setCancelModal({ reason: '', submitting: false, error: null });
+  const resetCancelModal = () => setCancelModal({ reason: '', submitting: false, error: null, voidedEnvelopeId: null });
 
   const loadAll = (): void => {
     setState({ kind: 'loading' });
@@ -174,9 +175,8 @@ const Extension: React.FC<ExtensionProps> = ({ context, actions }) => {
         dealId: state.dealId,
         reason: cancelModal.reason.trim(),
       });
+      setCancelModal({ reason: '', submitting: false, error: null, voidedEnvelopeId: state.envelopeId });
       actions.closeOverlay('cancel-contract-modal');
-      resetCancelModal();
-      setState({ kind: 'failed', envelopeId: state.envelopeId, status: 'voided' });
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Error desconocido';
       setCancelModal({ ...cancelModal, submitting: false, error: message });
@@ -284,7 +284,13 @@ const Extension: React.FC<ExtensionProps> = ({ context, actions }) => {
                   id="cancel-contract-modal"
                   title="Cancelar contrato"
                   variant="danger"
-                  onClose={resetCancelModal}
+                  onClose={() => {
+                    const eid = cancelModal.voidedEnvelopeId;
+                    resetCancelModal();
+                    if (eid) {
+                      setState({ kind: 'failed', envelopeId: eid, status: 'voided' });
+                    }
+                  }}
                 >
                   <ModalBody>
                     <Flex direction="column" gap="small">
