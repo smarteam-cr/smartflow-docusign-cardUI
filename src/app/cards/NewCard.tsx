@@ -171,7 +171,9 @@ const Extension: React.FC<ExtensionProps> = ({ context }) => {
       });
       reactions.closeModal('cancel-contract-modal');
       resetCancelModal();
-      setState({ kind: 'failed', envelopeId: state.envelopeId, status: 'voided' });
+      // Delay state transition to let HubSpot clean up the modal overlay
+      const eid = state.envelopeId;
+      setTimeout(() => setState({ kind: 'failed', envelopeId: eid, status: 'voided' }), 300);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Error desconocido';
       setCancelModal({ ...cancelModal, submitting: false, error: message });
