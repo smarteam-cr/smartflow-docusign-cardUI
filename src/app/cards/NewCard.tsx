@@ -25,7 +25,9 @@ function resolveInitialState(
   return { kind: 'ready', templates, contacts, selectedTemplateId: null, selectedContactId: null };
 }
 
-hubspot.extend<'crm.record.tab'>(({ context }) => <Extension context={context} />);
+hubspot.extend<'crm.record.tab'>(({ context, actions }) => (
+  <Extension context={context} actions={actions} />
+));
 
 interface ExtensionProps {
   context: {
@@ -33,9 +35,12 @@ interface ExtensionProps {
       objectId: string | number;
     };
   };
+  actions: {
+    closeOverlay: (id: string) => void;
+  };
 }
 
-const Extension: React.FC<ExtensionProps> = ({ context }) => {
+const Extension: React.FC<ExtensionProps> = ({ context, actions }) => {
   const dealId = String(context.crm.objectId);
   const [state, setState] = useState<UiState>({ kind: 'loading' });
   const [cancelModal, setCancelModal] = useState<{
@@ -156,7 +161,7 @@ const Extension: React.FC<ExtensionProps> = ({ context }) => {
     }
   };
 
-  const handleSubmitCancel = async (_event: unknown, reactions: { closeModal: (id: string) => void }): Promise<void> => {
+  const handleSubmitCancel = async (): Promise<void> => {
     if (state.kind !== 'active') return;
     if (cancelModal.reason.trim().length < 5) {
       setCancelModal({ ...cancelModal, error: 'La razon debe tener al menos 5 caracteres' });
@@ -169,11 +174,9 @@ const Extension: React.FC<ExtensionProps> = ({ context }) => {
         dealId: state.dealId,
         reason: cancelModal.reason.trim(),
       });
-      reactions.closeModal('cancel-contract-modal');
+      actions.closeOverlay('cancel-contract-modal');
       resetCancelModal();
-      // Delay state transition to let HubSpot clean up the modal overlay
-      const eid = state.envelopeId;
-      setTimeout(() => setState({ kind: 'failed', envelopeId: eid, status: 'voided' }), 300);
+      setState({ kind: 'failed', envelopeId: state.envelopeId, status: 'voided' });
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Error desconocido';
       setCancelModal({ ...cancelModal, submitting: false, error: message });
