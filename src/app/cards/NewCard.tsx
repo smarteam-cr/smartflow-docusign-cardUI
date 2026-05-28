@@ -1,15 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import { hubspot, Flex, LoadingSpinner, Text, Button, Modal, ModalBody, ModalFooter, Input } from '@hubspot/ui-extensions';
-import { fetchTemplates, fetchContacts, sendEnvelope, fetchEnvelopeStatus, voidEnvelope } from './api/client.js';
+import { hubspot, Flex, LoadingSpinner, Text, Button, Modal, ModalBody, ModalFooter, Input, Select } from '@hubspot/ui-extensions';
+import { fetchSendContext, sendEnvelope, fetchEnvelopeStatus, voidEnvelope } from './api/client.js';
 import { TemplateSelector } from './components/TemplateSelector.js';
 import { ContactSelector } from './components/ContactSelector.js';
 import { SendButton } from './components/SendButton.js';
 import { StatusMessage } from './components/StatusMessage.js';
-import type { UiState, Template, Contact, EnvelopeStatus } from './types.js';
+import type { UiState, SendContext, EnvelopeStatus } from './types.js';
 
 function resolveInitialState(
-  templates: Template[],
-  contacts: Contact[],
+  sendContext: SendContext,
   status: EnvelopeStatus,
   dealId: string
 ): UiState {
@@ -22,7 +21,7 @@ function resolveInitialState(
   if (['declined', 'voided', 'expired'].includes(status.status)) {
     return { kind: 'failed', envelopeId: status.envelopeId!, status: status.status };
   }
-  return { kind: 'ready', templates, contacts, selectedTemplateId: null, selectedContactId: null };
+  return { kind: 'ready', sendContext, selectedTemplateId: null, selectedContactId: null, selectedDirectionId: null };
 }
 
 hubspot.extend<'crm.record.tab'>(({ context, actions }) => (
@@ -54,29 +53,28 @@ const Extension: React.FC<ExtensionProps> = ({ context, actions }) => {
 
   const loadAll = (): void => {
     setState({ kind: 'loading' });
-    Promise.all([fetchTemplates(), fetchContacts(dealId), fetchEnvelopeStatus(dealId)])
-      .then(([templates, contacts, envelopeStatus]) => {
-        setState(resolveInitialState(templates, contacts, envelopeStatus, dealId));
+    Promise.all([fetchSendContext(dealId), fetchEnvelopeStatus(dealId)])
+      .then(([sendContext, envelopeStatus]) => {
+        setState(resolveInitialState(sendContext, envelopeStatus, dealId));
       })
       .catch((err: Error) => setState({ kind: 'loadError', message: err.message }));
   };
 
   const loadForNewContract = (): void => {
     setState({ kind: 'loading' });
-    Promise.all([fetchTemplates(), fetchContacts(dealId)])
-      .then(([templates, contacts]) => {
-        setState({ kind: 'ready', templates, contacts, selectedTemplateId: null, selectedContactId: null });
+    fetchSendContext(dealId)
+      .then((sendContext) => {
+        setState({ kind: 'ready', sendContext, selectedTemplateId: null, selectedContactId: null, selectedDirectionId: null });
       })
       .catch((err: Error) => setState({ kind: 'loadError', message: err.message }));
   };
 
-  // Initial load on mount, with cancelled flag in case user closes the card mid-fetch.
   useEffect(() => {
     let cancelled = false;
-    Promise.all([fetchTemplates(), fetchContacts(dealId), fetchEnvelopeStatus(dealId)])
-      .then(([templates, contacts, envelopeStatus]) => {
+    Promise.all([fetchSendContext(dealId), fetchEnvelopeStatus(dealId)])
+      .then(([sendContext, envelopeStatus]) => {
         if (cancelled) return;
-        setState(resolveInitialState(templates, contacts, envelopeStatus, dealId));
+        setState(resolveInitialState(sendContext, envelopeStatus, dealId));
       })
       .catch((err: Error) => {
         if (!cancelled) setState({ kind: 'loadError', message: err.message });
@@ -92,13 +90,12 @@ const Extension: React.FC<ExtensionProps> = ({ context, actions }) => {
       return;
     }
     if (state.kind === 'sendError') {
-      // After a sendError, picking returns to ready (clears the error).
       setState({
         kind: 'ready',
-        templates: state.templates,
-        contacts: state.contacts,
+        sendContext: state.sendContext,
         selectedTemplateId: id,
         selectedContactId: state.selectedContactId,
+        selectedDirectionId: state.selectedDirectionId,
       });
     }
   };
@@ -111,36 +108,58 @@ const Extension: React.FC<ExtensionProps> = ({ context, actions }) => {
     if (state.kind === 'sendError') {
       setState({
         kind: 'ready',
-        templates: state.templates,
-        contacts: state.contacts,
+        sendContext: state.sendContext,
         selectedTemplateId: state.selectedTemplateId,
         selectedContactId: id,
+        selectedDirectionId: state.selectedDirectionId,
+      });
+    }
+  };
+
+  const handleSelectDirection = (id: string): void => {
+    if (state.kind === 'ready') {
+      setState({ ...state, selectedDirectionId: id });
+      return;
+    }
+    if (state.kind === 'sendError') {
+      setState({
+        kind: 'ready',
+        sendContext: state.sendContext,
+        selectedTemplateId: state.selectedTemplateId,
+        selectedContactId: state.selectedContactId,
+        selectedDirectionId: id,
       });
     }
   };
 
   const handleSend = async (): Promise<void> => {
-    if (
-      state.kind !== 'ready' ||
-      !state.selectedTemplateId ||
-      !state.selectedContactId
-    ) {
-      return;
-    }
-    const { templates, contacts, selectedTemplateId, selectedContactId } = state;
+    if (state.kind !== 'ready' || !state.selectedTemplateId) return;
+
+    const { sendContext } = state;
+    const contactId = sendContext.clienteMode === 'juridico'
+      ? sendContext.juridicoContact!.id
+      : state.selectedContactId;
+    if (!contactId) return;
+
+    const directionId = sendContext.direcciones.length === 1
+      ? sendContext.direcciones[0].id
+      : state.selectedDirectionId ?? undefined;
+
+    const { selectedTemplateId, selectedDirectionId } = state;
     setState({
       kind: 'sending',
-      templates,
-      contacts,
+      sendContext,
       selectedTemplateId,
-      selectedContactId,
+      selectedContactId: contactId,
+      selectedDirectionId,
     });
 
     try {
       const result = await sendEnvelope({
         dealId,
         templateId: selectedTemplateId,
-        contactId: selectedContactId,
+        contactId,
+        directionId,
       });
       setState({
         kind: 'active',
@@ -153,10 +172,10 @@ const Extension: React.FC<ExtensionProps> = ({ context, actions }) => {
       const message = err instanceof Error ? err.message : 'Error desconocido';
       setState({
         kind: 'sendError',
-        templates,
-        contacts,
+        sendContext,
         selectedTemplateId,
-        selectedContactId,
+        selectedContactId: contactId,
+        selectedDirectionId,
         message,
       });
     }
@@ -223,7 +242,19 @@ const Extension: React.FC<ExtensionProps> = ({ context, actions }) => {
 
       {(state.kind === 'ready' || state.kind === 'sending' || state.kind === 'sendError') && (
         <Flex direction="column" gap="small">
-          {state.contacts.length === 0 && (
+          {state.sendContext.clienteMode === 'multiple_juridicos_error' && (
+            <StatusMessage variant="danger" title="Error: múltiples responsables jurídicos">
+              <Text>El Deal tiene más de un contacto marcado como responsable jurídico. Corrige en HubSpot.</Text>
+            </StatusMessage>
+          )}
+
+          {state.sendContext.clienteMode === 'juridico' && state.sendContext.juridicoContact && (
+            <StatusMessage variant="info" title="Cliente (responsable jurídico)">
+              <Text>{state.sendContext.juridicoContact.firstName} {state.sendContext.juridicoContact.lastName} ({state.sendContext.juridicoContact.email})</Text>
+            </StatusMessage>
+          )}
+
+          {state.sendContext.clienteMode === 'dropdown' && state.sendContext.contacts.length === 0 && (
             <StatusMessage variant="warning" title="Este Deal no tiene contactos con email">
               <Text>
                 Asocia al menos un contacto al Deal en HubSpot (con un email válido) para
@@ -232,29 +263,48 @@ const Extension: React.FC<ExtensionProps> = ({ context, actions }) => {
             </StatusMessage>
           )}
 
-          <Text>Selecciona el documento y el contacto destinatario:</Text>
+          <Text>Selecciona el documento{state.sendContext.clienteMode === 'dropdown' ? ' y el contacto destinatario' : ''}:</Text>
 
           <TemplateSelector
-            templates={state.templates}
+            templates={state.sendContext.templates}
             value={state.selectedTemplateId}
             disabled={state.kind === 'sending'}
             onChange={handleSelectTemplate}
           />
 
-          <ContactSelector
-            contacts={state.contacts}
-            value={state.selectedContactId}
-            disabled={state.kind === 'sending' || state.contacts.length === 0}
-            onChange={handleSelectContact}
-          />
+          {state.sendContext.clienteMode === 'dropdown' && (
+            <ContactSelector
+              contacts={state.sendContext.contacts}
+              value={state.selectedContactId}
+              disabled={state.kind === 'sending' || state.sendContext.contacts.length === 0}
+              onChange={handleSelectContact}
+            />
+          )}
+
+          {state.sendContext.direcciones.length === 1 && (
+            <Text>Dirección: {state.sendContext.direcciones[0].direction} (auto)</Text>
+          )}
+
+          {state.sendContext.direcciones.length > 1 && (
+            <Select
+              label="Dirección"
+              name="direction"
+              options={state.sendContext.direcciones.map(d => ({ label: d.direction, value: d.id }))}
+              value={state.selectedDirectionId ?? undefined}
+              placeholder="Seleccione una dirección"
+              onChange={(v: string | number | boolean) => handleSelectDirection(String(v))}
+              readOnly={state.kind === 'sending'}
+            />
+          )}
 
           <SendButton
             disabled={
               state.kind === 'sending' ||
-              state.contacts.length === 0 ||
-              state.templates.length === 0 ||
-              (state.kind === 'ready' &&
-                (!state.selectedTemplateId || !state.selectedContactId))
+              state.sendContext.clienteMode === 'multiple_juridicos_error' ||
+              state.sendContext.templates.length === 0 ||
+              !state.selectedTemplateId ||
+              (state.sendContext.clienteMode === 'dropdown' && !state.selectedContactId) ||
+              (state.sendContext.direcciones.length > 1 && !state.selectedDirectionId)
             }
             loading={state.kind === 'sending'}
             onClick={handleSend}
