@@ -6,10 +6,6 @@ export interface Template {
   name: string;
 }
 
-/**
- * A HubSpot contact associated to the Deal, as returned by
- * GET /api/v1/hubspot/deals/:dealId/contacts.
- */
 export interface Contact {
   id: string;
   firstName: string;
@@ -18,9 +14,19 @@ export interface Contact {
   docIdentificacion: string;
 }
 
-/**
- * Result of POST /api/v1/docusign/envelopes.
- */
+export interface Direccion {
+  id: string;
+  direction: string;
+}
+
+export interface SendContext {
+  clienteMode: 'juridico' | 'dropdown' | 'multiple_juridicos_error';
+  juridicoContact: Contact | null;
+  contacts: Contact[];
+  direcciones: Direccion[];
+  templates: Template[];
+}
+
 export interface SendEnvelopeResult {
   envelopeId: string;
   status: string;
@@ -53,25 +59,25 @@ export type UiState =
   | { kind: 'loading' }
   | {
       kind: 'ready';
-      templates: Template[];
-      contacts: Contact[];
+      sendContext: SendContext;
       selectedTemplateId: string | null;
       selectedContactId: string | null;
+      selectedDirectionId: string | null;
     }
   | { kind: 'loadError'; message: string }
   | {
       kind: 'sending';
-      templates: Template[];
-      contacts: Contact[];
+      sendContext: SendContext;
       selectedTemplateId: string;
       selectedContactId: string;
+      selectedDirectionId: string | null;
     }
   | {
       kind: 'sendError';
-      templates: Template[];
-      contacts: Contact[];
+      sendContext: SendContext;
       selectedTemplateId: string;
       selectedContactId: string;
+      selectedDirectionId: string | null;
       message: string;
     }
   | {

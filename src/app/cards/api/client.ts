@@ -1,5 +1,5 @@
 import { hubspot } from '@hubspot/ui-extensions';
-import type { Contact, Template, SendEnvelopeResult, EnvelopeStatus } from '../types.js';
+import type { SendContext, SendEnvelopeResult, EnvelopeStatus } from '../types.js';
 
 /**
  * Dummy HTTPS URL that the HubSpot CLI proxies to http://localhost:3000 in dev
@@ -26,41 +26,16 @@ async function extractErrorMessage(res: Response, fallback: string): Promise<str
   }
 }
 
-/**
- * GET /api/v1/docusign/templates → list of DocuSign templates.
- * @throws Error with a user-friendly message on failure.
- */
-export async function fetchTemplates(): Promise<Template[]> {
-  const res = await hubspot.fetch(`${API_BASE}/api/v1/docusign/templates`, {
-    method: 'GET',
-  });
-
-  if (!res.ok) {
-    const msg = await extractErrorMessage(res, 'No pudimos cargar los documentos');
-    throw new Error(msg);
-  }
-
-  const body = (await res.json()) as { templates?: Template[] };
-  return body.templates ?? [];
-}
-
-/**
- * GET /api/v1/hubspot/deals/:dealId/contacts → contacts associated to the Deal.
- * @throws Error with a user-friendly message on failure.
- */
-export async function fetchContacts(dealId: string): Promise<Contact[]> {
+export async function fetchSendContext(dealId: string): Promise<SendContext> {
   const res = await hubspot.fetch(
-    `${API_BASE}/api/v1/hubspot/deals/${encodeURIComponent(dealId)}/contacts`,
+    `${API_BASE}/api/v1/deals/${encodeURIComponent(dealId)}/send-context`,
     { method: 'GET' }
   );
-
   if (!res.ok) {
-    const msg = await extractErrorMessage(res, 'No pudimos cargar los contactos del Deal');
+    const msg = await extractErrorMessage(res, 'No pudimos cargar el contexto de envío');
     throw new Error(msg);
   }
-
-  const body = (await res.json()) as { contacts?: Contact[] };
-  return body.contacts ?? [];
+  return (await res.json()) as SendContext;
 }
 
 /**
@@ -72,6 +47,7 @@ export async function sendEnvelope(input: {
   dealId: string;
   templateId: string;
   contactId: string;
+  directionId?: string;
 }): Promise<SendEnvelopeResult> {
   const res = await hubspot.fetch(`${API_BASE}/api/v1/docusign/envelopes`, {
     method: 'POST',
