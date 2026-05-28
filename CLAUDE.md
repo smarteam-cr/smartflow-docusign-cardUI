@@ -198,12 +198,14 @@ IMPORTANT: IF THE 'HubSpotDev' MCP SERVER IS INSTALLED USE THE TOOLS BEFORE TRYI
 
 ## Qué hace esta card
 
-Card en el sidebar del registro de **Deal** que permite enviar un documento DocuSign a un contacto asociado del Deal, elegido explícitamente por el usuario:
+Card en el sidebar del registro de **Deal** que permite enviar un documento DocuSign a un contacto asociado del Deal:
 
-1. Al cargar: en paralelo `GET /api/v1/docusign/templates` y `GET /api/v1/hubspot/deals/:id/contacts` → poblar ambos dropdowns.
-2. Usuario selecciona un Template Y un Contacto → click "Enviar".
-3. `POST /api/v1/docusign/envelopes` con `{ dealId, templateId, contactId }` → backend valida pertenencia y envía envelope al contacto elegido.
-4. La card muestra confirmación con el email del destinatario, o el error correspondiente.
+1. Al cargar: `GET /api/v1/deals/:dealId/send-context` (templates, contactos, direcciones, modo jurídico) + `GET /api/v1/deals/:dealId/envelope-status`.
+2. Según `clienteMode`: jurídico → banner auto, dropdown → selector de contacto, multiple_juridicos_error → alert rojo bloqueante.
+3. Direcciones: 0 → oculto, 1 → auto, 2+ → dropdown.
+4. Usuario selecciona Template (+ Contacto si dropdown + Dirección si 2+) → click "Enviar".
+5. `POST /api/v1/docusign/envelopes` con `{ dealId, templateId, contactId, directionId? }`.
+6. La card muestra estado lifecycle (active/signed/failed) con acciones correspondientes.
 
 ---
 
@@ -241,28 +243,30 @@ type UiState =
   | { kind: 'loading' }
   | {
       kind: 'ready';
-      templates: Template[];
-      contacts: Contact[];
+      sendContext: SendContext;
       selectedTemplateId: string | null;
       selectedContactId: string | null;
+      selectedDirectionId: string | null;
     }
   | { kind: 'loadError'; message: string }
   | {
       kind: 'sending';
-      templates: Template[];
-      contacts: Contact[];
+      sendContext: SendContext;
       selectedTemplateId: string;
       selectedContactId: string;
+      selectedDirectionId: string | null;
     }
-  | { kind: 'success'; recipientEmail: string }
   | {
       kind: 'sendError';
-      templates: Template[];
-      contacts: Contact[];
+      sendContext: SendContext;
       selectedTemplateId: string;
       selectedContactId: string;
+      selectedDirectionId: string | null;
       message: string;
-    };
+    }
+  | { kind: 'active'; envelopeId: string; dealId: string; status: string; sentAt: string | null; }
+  | { kind: 'signed'; envelopeId: string; signedAt: string | null; pdfUrl: string | null; }
+  | { kind: 'failed'; envelopeId: string; status: string; };
 ```
 
 TypeScript garantiza que en cada estado solo accedes a las propiedades válidas. **No renderices estados que no existan en este tipo.** Si necesitas un estado nuevo, añádelo aquí — TS te guiará por todos los lugares que tienen que cambiar.
@@ -276,13 +280,16 @@ Las llamadas al backend **NUNCA** viven en componentes. Siempre en `api/client.t
 ```ts
 const API_BASE = 'https://api.docusign-integration.local';   // dummy en dev
 
-export async function fetchTemplates(): Promise<Template[]> {
-  const res = await hubspot.fetch(`${API_BASE}/api/v1/docusign/templates`);
+export async function fetchSendContext(dealId: string): Promise<SendContext> {
+  const res = await hubspot.fetch(
+    `${API_BASE}/api/v1/deals/${encodeURIComponent(dealId)}/send-context`,
+    { method: 'GET' }
+  );
   if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    throw new Error(body.message ?? 'No pudimos cargar los documentos');
+    const msg = await extractErrorMessage(res, 'No pudimos cargar el contexto de envío');
+    throw new Error(msg);
   }
-  return (await res.json()).templates;
+  return (await res.json()) as SendContext;
 }
 ```
 
@@ -337,21 +344,19 @@ hubspot.extend<'crm.record.tab'>(({ context }) => {
 
 ## Estado actual vs Plan 12 (frontend)
 
-**Implementado (v1 — rama main):**
+**Implementado (rama `v2-grupo-inve-ui`):**
 - ✅ Lista templates con `<Select>`
-- ✅ Selección de contacto con dropdown (`ContactSelector`)
-- ✅ Botón "Enviar" con state machine (loading, ready, sending, success, error)
+- ✅ Jurídico auto (banner) vs dropdown (ContactSelector) vs error (alert rojo bloqueante)
+- ✅ Direcciones: 0→oculto, 1→auto, 2+→dropdown
+- ✅ `fetchSendContext` reemplaza `fetchTemplates` + `fetchContacts`
+- ✅ Vistas lifecycle: ACTIVE (sent/signing) con "Cancelar" + "Refrescar", SIGNED con "Ver PDF" + "Nuevo contrato", FAILED con "Nuevo contrato"
+- ✅ Modal de cancelación (razón obligatoria min 5 chars)
+- ✅ `sendEnvelope` con `directionId` opcional
 - ✅ Solo castellano hardcoded
 
-**Plan 12 — F6 Card UI completa (rama `v2-grupo-inve`, próximo plan):**
-- Jurídico auto vs dropdown: si hay 1 contacto con label `responsable_jurídico` → banner auto, sin dropdown; si hay 0 → dropdown normal; si >1 → error
-- Dropdown de direcciones de la empresa asociada (usa `directionId` opcional del backend)
-- Vistas por estado lifecycle: ACTIVE (sent/signing) con botón "Cancelar" + "Refrescar", SIGNED con "Ver PDF" + "Nuevo contrato", FAILED (declined/voided/expired) con "Nuevo contrato"
+**Pendiente (Plan 12 restante):**
 - Modal de confirmación antes de enviar (resumen de firmantes + template + empresa)
-- Modal de cancelación (razón obligatoria min 5 chars)
 - Indicador "✓ Cotización vinculada" / "✓ N capex incluidos"
-- Endpoint `GET /deals/:dealId/envelope-status` para estado actual
-- Endpoint `POST /envelopes/:envelopeId/void` para cancelar
 
 **Roadmap (post-v2):**
 - React Query (cache, retry, optimistic UI)
