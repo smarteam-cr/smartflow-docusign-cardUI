@@ -297,6 +297,15 @@ const Extension: React.FC<ExtensionProps> = ({ context, actions }) => {
             />
           )}
 
+          {state.sendContext.company && (
+            <Text>Empresa: {state.sendContext.company.razonSocial}</Text>
+          )}
+          {state.sendContext.hasQuote && <Text>✓ Cotización vinculada</Text>}
+          {state.sendContext.capexCount > 0 && (
+            <Text>✓ {state.sendContext.capexCount} capex incluidos</Text>
+          )}
+          <Text format={{ italic: true }}>Firmará en orden: Propietario → Proveedor → Cliente</Text>
+
           <SendButton
             disabled={
               state.kind === 'sending' ||
