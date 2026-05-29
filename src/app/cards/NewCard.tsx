@@ -42,6 +42,7 @@ interface ExtensionProps {
 const Extension: React.FC<ExtensionProps> = ({ context, actions }) => {
   const dealId = String(context.crm.objectId);
   const [state, setState] = useState<UiState>({ kind: 'loading' });
+  const [confirmTriggered, setConfirmTriggered] = useState(false);
   const [cancelModal, setCancelModal] = useState<{
     reason: string;
     submitting: boolean;
@@ -316,7 +317,53 @@ const Extension: React.FC<ExtensionProps> = ({ context, actions }) => {
               (state.sendContext.direcciones.length > 1 && !state.selectedDirectionId)
             }
             loading={state.kind === 'sending'}
-            onClick={handleSend}
+            onClick={() => {}}
+            overlay={(() => {
+              const ctx = state.sendContext;
+              const tpl = ctx.templates.find(t => t.id === state.selectedTemplateId);
+              const cliente = ctx.clienteMode === 'juridico'
+                ? ctx.juridicoContact
+                : ctx.contacts.find(c => c.id === state.selectedContactId) ?? null;
+              const dirLabel = ctx.direcciones.length === 1
+                ? ctx.direcciones[0].direction
+                : ctx.direcciones.find(d => d.id === state.selectedDirectionId)?.direction ?? null;
+
+              return (
+                <Modal
+                  id="confirm-send-modal"
+                  title="Confirmar envío"
+                  onClose={() => {
+                    if (confirmTriggered) {
+                      setConfirmTriggered(false);
+                      handleSend();
+                    }
+                  }}
+                >
+                  <ModalBody>
+                    <Flex direction="column" gap="small">
+                      {tpl && <Text format={{ fontWeight: 'bold' }}>Documento: {tpl.name}</Text>}
+                      {ctx.company && <Text>Empresa: {ctx.company.razonSocial} ({ctx.company.pais})</Text>}
+                      {dirLabel && <Text>Dirección: {dirLabel}</Text>}
+                      {cliente && <Text>Cliente: {cliente.firstName} {cliente.lastName} ({cliente.email})</Text>}
+                      {ctx.hasQuote && <Text>✓ Cotización vinculada</Text>}
+                      {ctx.capexCount > 0 && <Text>✓ {ctx.capexCount} capex incluidos</Text>}
+                      <Text format={{ italic: true }}>El documento será firmado en orden: Propietario → Proveedor → Cliente</Text>
+                    </Flex>
+                  </ModalBody>
+                  <ModalFooter>
+                    <Button
+                      variant="primary"
+                      onClick={() => {
+                        setConfirmTriggered(true);
+                        actions.closeOverlay('confirm-send-modal');
+                      }}
+                    >
+                      Confirmar envío
+                    </Button>
+                  </ModalFooter>
+                </Modal>
+              );
+            })()}
           />
 
           {state.kind === 'sendError' && (

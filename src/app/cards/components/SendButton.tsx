@@ -6,15 +6,11 @@ interface Props {
   loading: boolean;
   onClick: () => void;
   label?: string;
+  overlay?: React.ReactNode;
 }
 
-/**
- * Primary action button with a loading state. While loading=true, the label
- * becomes "Enviando..." and the button is forced disabled regardless of the
- * disabled prop (so the user can't double-click during a send).
- */
-export const SendButton: React.FC<Props> = ({ disabled, loading, onClick, label = 'Enviar documento' }) => (
-  <Button onClick={onClick} disabled={disabled || loading} variant="primary">
+export const SendButton: React.FC<Props> = ({ disabled, loading, onClick, label = 'Enviar documento', overlay }) => (
+  <Button onClick={onClick} disabled={disabled || loading} variant="primary" overlay={overlay}>
     {loading ? 'Enviando...' : label}
   </Button>
 );
