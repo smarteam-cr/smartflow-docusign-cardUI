@@ -19,12 +19,20 @@ export interface Direccion {
   direction: string;
 }
 
+export interface Company {
+  razonSocial: string;
+  pais: string;
+}
+
 export interface SendContext {
   clienteMode: 'juridico' | 'dropdown' | 'multiple_juridicos_error';
   juridicoContact: Contact | null;
   contacts: Contact[];
   direcciones: Direccion[];
   templates: Template[];
+  company: Company | null;
+  capexCount: number;
+  hasQuote: boolean;
 }
 
 export interface SendEnvelopeResult {
