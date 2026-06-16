@@ -1,9 +1,9 @@
-# DocuSign + HubSpot — Card UI (`react_CLI_hs_card`)
+# DocuSign + HubSpot — Card UI (`smartflow-docusign-card`)
 
 **HubSpot UI Extension** (React + TypeScript) que añade una *card* en el sidebar de los **Deals**.
 Desde ahí el usuario envía un documento para firmar con DocuSign y ve el estado de la firma, sin salir de HubSpot.
 
-> Repo GitHub: `git@github.com:Dfer07/react_CLI_hs_card.git`
+> Repo GitHub: `git@github.com:smarteam-cr/smartflow-docusign-card.git`
 > Consume el backend `docusign_integration_hs`.
 
 ---
@@ -57,7 +57,7 @@ dummy** declarada en `permittedUrls.fetch` y un **proxy** que la redirige al bac
 
 ### Comandos
 ```bash
-hs project dev       # dev server con hot reload; la card muestra el tag "Developing locally"
+hs project dev --project-account [PortalIDHS] --testing-account [PortalIDHS]      # dev server con hot reload; la card muestra el tag "Developing locally"
 hs project upload    # sube y construye el proyecto en la cuenta de HubSpot
 hs project deploy    # publica un build (lo deja en vivo)
 ```
