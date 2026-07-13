@@ -47,15 +47,15 @@ export async function fetchSendContext(dealId: string): Promise<SendContext> {
 export async function sendEnvelope(input: {
   dealId: string;
   templateId: string;
-  /** Omitted when the Deal has no associated contact with email. */
-  contactId?: string;
+  /** The Deal contact with the "Responsable Jurídico" association label (the signer). */
+  contactId: string;
   /** Location text as it should appear in the document (never a HubSpot record id). */
   location: string;
   /** Country text selected in the card's dropdown. */
   country: string;
   /** Agreement text selected in the card's "Acuerdo" dropdown (one of AGREEMENTS). */
   commercialAgreement: string;
-  /** Always required: typed by the seller in the card. */
+  /** Full name of the "Responsable Jurídico" contact; derived by the card, no longer typed by the seller. */
   legalRepresentative: string;
   /** Always required: contacts don't have a DNI field in HubSpot yet, so the seller types it. */
   dniLegalRepresentative: string;

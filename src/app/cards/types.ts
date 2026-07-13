@@ -95,7 +95,6 @@ export type UiState =
       selectedCountry: string | null;
       selectedAgreement: string | null;
       customLocation: string;
-      legalRepresentative: string;
       dniLegalRepresentative: string;
     }
   | { kind: 'loadError'; message: string }
@@ -108,7 +107,6 @@ export type UiState =
       selectedCountry: string | null;
       selectedAgreement: string | null;
       customLocation: string;
-      legalRepresentative: string;
       dniLegalRepresentative: string;
     }
   | {
@@ -120,7 +118,6 @@ export type UiState =
       selectedCountry: string | null;
       selectedAgreement: string | null;
       customLocation: string;
-      legalRepresentative: string;
       dniLegalRepresentative: string;
       message: string;
     }

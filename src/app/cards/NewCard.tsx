@@ -2,19 +2,23 @@ import React, { useEffect, useState } from 'react';
 import { hubspot, Flex, LoadingSpinner, Text, Button, Modal, ModalBody, ModalFooter, Input, Select } from '@hubspot/ui-extensions';
 import { fetchSendContext, sendEnvelope, fetchEnvelopeStatus, voidEnvelope } from './api/client.js';
 import { TemplateSelector } from './components/TemplateSelector.js';
-import { ContactSelector } from './components/ContactSelector.js';
 import { SendButton } from './components/SendButton.js';
 import { StatusMessage } from './components/StatusMessage.js';
 import { CUSTOM_LOCATION, COUNTRIES, AGREEMENTS } from './types.js';
-import type { UiState, SendContext, EnvelopeStatus } from './types.js';
+import type { UiState, SendContext, EnvelopeStatus, Contact } from './types.js';
 
 type ReadyState = Extract<UiState, { kind: 'ready' }>;
 type FormState = Extract<UiState, { kind: 'ready' | 'sending' | 'sendError' }>;
 type FormPatch = Partial<Omit<ReadyState, 'kind' | 'sendContext'>>;
 
-/** The Deal has no associated contact with email → the seller fills in the legal representative manually. */
-function hasNoContacts(sendContext: SendContext): boolean {
-  return sendContext.clienteMode === 'dropdown' && sendContext.contacts.length === 0;
+/**
+ * The signer is the single Deal contact with the "Responsable Jurídico"
+ * association label. Sending is blocked unless exactly one exists
+ * (clienteMode === 'juridico'); 'dropdown' means zero tagged contacts and
+ * 'multiple_juridicos_error' means two or more — both are blocking errors.
+ */
+function fullName(contact: Contact): string {
+  return `${contact.firstName} ${contact.lastName}`.trim();
 }
 
 /** Location text to send to the API: the chosen dirección's text, or the manually typed one. */
@@ -27,16 +31,16 @@ function resolveLocation(state: FormState): string {
 }
 
 function initialReady(sendContext: SendContext): UiState {
+  const juridico = sendContext.clienteMode === 'juridico' ? sendContext.juridicoContact : null;
   return {
     kind: 'ready',
     sendContext,
     selectedTemplateId: null,
-    selectedContactId: null,
+    selectedContactId: juridico?.id ?? null,
     selectedDirectionId: sendContext.direcciones.length === 1 ? sendContext.direcciones[0].id : null,
     selectedCountry: null,
     selectedAgreement: null,
     customLocation: '',
-    legalRepresentative: '',
     dniLegalRepresentative: '',
   };
 }
@@ -77,6 +81,8 @@ const Extension: React.FC<ExtensionProps> = ({ context, actions }) => {
   const dealId = String(context.crm.objectId);
   const [state, setState] = useState<UiState>({ kind: 'loading' });
   const [confirmTriggered, setConfirmTriggered] = useState(false);
+  /** Set when the seller clicks "Enviar" without exactly one "Responsable Jurídico" contact. */
+  const [signerError, setSignerError] = useState<string | null>(null);
   const [cancelModal, setCancelModal] = useState<{
     reason: string;
     submitting: boolean;
@@ -87,6 +93,7 @@ const Extension: React.FC<ExtensionProps> = ({ context, actions }) => {
   const resetCancelModal = () => setCancelModal({ reason: '', submitting: false, error: null, voidedEnvelopeId: null });
 
   const loadAll = (): void => {
+    setSignerError(null);
     setState({ kind: 'loading' });
     Promise.all([fetchSendContext(dealId), fetchEnvelopeStatus(dealId)])
       .then(([sendContext, envelopeStatus]) => {
@@ -96,6 +103,7 @@ const Extension: React.FC<ExtensionProps> = ({ context, actions }) => {
   };
 
   const loadForNewContract = (): void => {
+    setSignerError(null);
     setState({ kind: 'loading' });
     fetchSendContext(dealId)
       .then((sendContext) => setState(initialReady(sendContext)))
@@ -133,7 +141,6 @@ const Extension: React.FC<ExtensionProps> = ({ context, actions }) => {
         selectedCountry: state.selectedCountry,
         selectedAgreement: state.selectedAgreement,
         customLocation: state.customLocation,
-        legalRepresentative: state.legalRepresentative,
         dniLegalRepresentative: state.dniLegalRepresentative,
         ...patch,
       });
@@ -144,16 +151,13 @@ const Extension: React.FC<ExtensionProps> = ({ context, actions }) => {
     if (state.kind !== 'ready' || !state.selectedTemplateId) return;
 
     const { sendContext } = state;
-    const noContacts = hasNoContacts(sendContext);
-    const contactId = sendContext.clienteMode === 'juridico'
-      ? sendContext.juridicoContact!.id
-      : state.selectedContactId;
-    if (!noContacts && !contactId) return;
+    if (sendContext.clienteMode !== 'juridico' || !sendContext.juridicoContact) return;
+    const contactId = sendContext.juridicoContact.id;
 
     const location = resolveLocation(state);
     if (!location) return;
 
-    const legalRepresentative = state.legalRepresentative.trim();
+    const legalRepresentative = fullName(sendContext.juridicoContact) || sendContext.juridicoContact.email;
     const dniLegalRepresentative = state.dniLegalRepresentative.trim();
     if (!legalRepresentative || !dniLegalRepresentative) return;
 
@@ -168,12 +172,11 @@ const Extension: React.FC<ExtensionProps> = ({ context, actions }) => {
       kind: 'sending',
       sendContext,
       selectedTemplateId,
-      selectedContactId: noContacts ? null : contactId,
+      selectedContactId: contactId,
       selectedDirectionId,
       selectedCountry,
       selectedAgreement,
       customLocation,
-      legalRepresentative: state.legalRepresentative,
       dniLegalRepresentative: state.dniLegalRepresentative,
     });
 
@@ -181,7 +184,7 @@ const Extension: React.FC<ExtensionProps> = ({ context, actions }) => {
       const result = await sendEnvelope({
         dealId,
         templateId: selectedTemplateId,
-        contactId: noContacts ? undefined : contactId!,
+        contactId,
         location,
         country,
         commercialAgreement,
@@ -201,12 +204,11 @@ const Extension: React.FC<ExtensionProps> = ({ context, actions }) => {
         kind: 'sendError',
         sendContext,
         selectedTemplateId,
-        selectedContactId: noContacts ? null : contactId,
+        selectedContactId: contactId,
         selectedDirectionId,
         selectedCountry,
         selectedAgreement,
         customLocation,
-        legalRepresentative: state.legalRepresentative,
         dniLegalRepresentative: state.dniLegalRepresentative,
         message,
       });
@@ -249,10 +251,6 @@ const Extension: React.FC<ExtensionProps> = ({ context, actions }) => {
       .catch((err: Error) => setState({ kind: 'loadError', message: err.message }));
   };
 
-  const noContacts =
-    (state.kind === 'ready' || state.kind === 'sending' || state.kind === 'sendError') &&
-    hasNoContacts(state.sendContext);
-
   return (
     <Flex direction="column" gap="medium">
 
@@ -278,51 +276,19 @@ const Extension: React.FC<ExtensionProps> = ({ context, actions }) => {
 
       {(state.kind === 'ready' || state.kind === 'sending' || state.kind === 'sendError') && (
         <Flex direction="column" gap="small">
-          {state.sendContext.clienteMode === 'multiple_juridicos_error' && (
-            <StatusMessage variant="danger" title="Error: múltiples responsables jurídicos">
-              <Text>El Deal tiene más de un contacto marcado como responsable jurídico. Corrige en HubSpot.</Text>
-            </StatusMessage>
-          )}
-
           {state.sendContext.clienteMode === 'juridico' && state.sendContext.juridicoContact && (
-            <StatusMessage variant="info" title="Cliente (responsable jurídico)">
+            <StatusMessage variant="info" title="Firmante (responsable jurídico)">
               <Text>{state.sendContext.juridicoContact.firstName} {state.sendContext.juridicoContact.lastName} ({state.sendContext.juridicoContact.email})</Text>
             </StatusMessage>
           )}
 
-          {noContacts && (
-            <StatusMessage variant="warning" title="Este Deal no tiene contactos con email">
-              <Text>
-                Ingresa los datos del representante legal para crear el firmante en DocuSign.
-              </Text>
-            </StatusMessage>
-          )}
-
-          <Text>Selecciona el documento{state.sendContext.clienteMode === 'dropdown' && !noContacts ? ' y el contacto destinatario' : ''}:</Text>
+          <Text>Selecciona el documento:</Text>
 
           <TemplateSelector
             templates={state.sendContext.templates}
             value={state.selectedTemplateId}
             disabled={state.kind === 'sending'}
             onChange={(id) => updateForm({ selectedTemplateId: id })}
-          />
-
-          {state.sendContext.clienteMode === 'dropdown' && !noContacts && (
-            <ContactSelector
-              contacts={state.sendContext.contacts}
-              value={state.selectedContactId}
-              disabled={state.kind === 'sending'}
-              onChange={(id) => updateForm({ selectedContactId: id })}
-            />
-          )}
-
-          <Input
-            label="Representante legal"
-            name="legal-representative"
-            value={state.legalRepresentative}
-            placeholder="Nombre completo del representante legal"
-            onChange={(v) => updateForm({ legalRepresentative: String(v) })}
-            readOnly={state.kind === 'sending'}
           />
 
           <Input
@@ -392,24 +358,27 @@ const Extension: React.FC<ExtensionProps> = ({ context, actions }) => {
           <SendButton
             disabled={
               state.kind === 'sending' ||
-              state.sendContext.clienteMode === 'multiple_juridicos_error' ||
               state.sendContext.templates.length === 0 ||
               !state.selectedTemplateId ||
-              (state.sendContext.clienteMode === 'dropdown' && !noContacts && !state.selectedContactId) ||
               resolveLocation(state) === '' ||
               !state.selectedCountry ||
               !state.selectedAgreement ||
-              state.legalRepresentative.trim() === '' ||
               state.dniLegalRepresentative.trim() === ''
             }
             loading={state.kind === 'sending'}
-            onClick={() => {}}
-            overlay={(() => {
+            onClick={() => {
+              if (state.sendContext.clienteMode === 'multiple_juridicos_error') {
+                setSignerError('El Deal tiene más de un contacto con la etiqueta "Responsable Jurídico". Deja la etiqueta en un solo contacto en HubSpot y vuelve a comprobar.');
+              } else if (state.sendContext.clienteMode !== 'juridico' || !state.sendContext.juridicoContact) {
+                setSignerError('Ningún contacto asociado al Deal tiene la etiqueta "Responsable Jurídico". Asígnala a exactamente un contacto en HubSpot (Contactos → ⋯ → Editar etiquetas de asociación) y vuelve a comprobar.');
+              } else {
+                setSignerError(null);
+              }
+            }}
+            overlay={state.sendContext.clienteMode !== 'juridico' || !state.sendContext.juridicoContact ? undefined : (() => {
               const ctx = state.sendContext;
               const tpl = ctx.templates.find(t => t.id === state.selectedTemplateId);
-              const cliente = ctx.clienteMode === 'juridico'
-                ? ctx.juridicoContact
-                : ctx.contacts.find(c => c.id === state.selectedContactId) ?? null;
+              const cliente = ctx.clienteMode === 'juridico' ? ctx.juridicoContact : null;
               const location = resolveLocation(state);
 
               return (
@@ -431,8 +400,8 @@ const Extension: React.FC<ExtensionProps> = ({ context, actions }) => {
                       {state.selectedCountry && <Text>País: {state.selectedCountry}</Text>}
                       {state.selectedAgreement && <Text>Acuerdo: {state.selectedAgreement}</Text>}
                       {cliente && <Text>Cliente: {cliente.firstName} {cliente.lastName} ({cliente.email})</Text>}
-                      {state.legalRepresentative.trim() !== '' && (
-                        <Text>Representante legal: {state.legalRepresentative}</Text>
+                      {cliente && (
+                        <Text>Representante legal: {fullName(cliente) || cliente.email}</Text>
                       )}
                       {state.dniLegalRepresentative.trim() !== '' && (
                         <Text>DNI del firmante: {state.dniLegalRepresentative}</Text>
@@ -457,6 +426,15 @@ const Extension: React.FC<ExtensionProps> = ({ context, actions }) => {
               );
             })()}
           />
+
+          {signerError && (
+            <>
+              <StatusMessage variant="danger" title="No se puede enviar">
+                <Text>{signerError}</Text>
+              </StatusMessage>
+              <Button variant="secondary" onClick={loadAll}>Volver a comprobar</Button>
+            </>
+          )}
 
           {state.kind === 'sendError' && (
             <StatusMessage variant="danger" title="No se pudo enviar">
