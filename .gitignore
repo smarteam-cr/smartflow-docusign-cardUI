@@ -7,3 +7,6 @@ hubspot.config.yml
 !.env.sample
 .vite/
 .DS_Store
+
+# HubSpot link folder
+.hs

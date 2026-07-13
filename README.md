@@ -36,7 +36,7 @@ y delega todo al backend.
 ### Requisitos previos
 - **Node.js ≥ 18** y **HubSpot CLI** (`npm i -g @hubspot/cli`).
 - Cuenta **HubSpot** autenticada en el CLI (`hs account auth`) con acceso a developer projects.
-- El **backend corriendo en local** (`http://localhost:3000`) para que la card tenga a quién llamar.
+- El **backend corriendo en local** (`http://localhost:3002`) para que la card tenga a quién llamar.
 
 ### Instalación
 ```bash
@@ -52,7 +52,7 @@ dummy** declarada en `permittedUrls.fetch` y un **proxy** que la redirige al bac
    `https://api.hubapi.com` y `https://api.docusign-integration.local`.
 2. `src/app/local.json` (junto al `app-hsmeta.json`, **no** dentro de `cards/`) hace el proxy:
    ```json
-   { "proxy": { "https://api.docusign-integration.local": "http://localhost:3000" } }
+   { "proxy": { "https://api.docusign-integration.local": "http://localhost:3002" } }
    ```
 
 ### Comandos

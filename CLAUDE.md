@@ -158,7 +158,7 @@ IMPORTANT: IF THE 'HubSpotDev' MCP SERVER IS INSTALLED USE THE TOOLS BEFORE TRYI
 - `hs create template <name>` - Create a new template
 - `hs create module <name>` - Create a new module
 - `hs create function <name>` - Create a new serverless function
-- `hs theme preview` - Preview a theme locally at https://hslocal.net:3000/
+- `hs theme preview` - Preview a theme locally at https://hslocal.net:3002/
 
 ### Sandbox Management
 - `hs sandbox create` - Create a development sandbox account
@@ -201,10 +201,10 @@ IMPORTANT: IF THE 'HubSpotDev' MCP SERVER IS INSTALLED USE THE TOOLS BEFORE TRYI
 Card en el sidebar del registro de **Deal** que permite enviar un documento DocuSign a un contacto asociado del Deal:
 
 1. Al cargar: `GET /api/v1/deals/:dealId/send-context` (templates, contactos, direcciones, modo jurídico) + `GET /api/v1/deals/:dealId/envelope-status`.
-2. Según `clienteMode`: jurídico → banner auto, dropdown → selector de contacto, multiple_juridicos_error → alert rojo bloqueante.
-3. Direcciones: 0 → oculto, 1 → auto, 2+ → dropdown.
-4. Usuario selecciona Template (+ Contacto si dropdown + Dirección si 2+) → click "Enviar".
-5. `POST /api/v1/docusign/envelopes` con `{ dealId, templateId, contactId, directionId? }`.
+2. Según `clienteMode`: jurídico → banner auto, dropdown → selector de contacto, multiple_juridicos_error → alert rojo bloqueante. Si el Deal no tiene contactos con email (dropdown + lista vacía), no se envía `contactId`. Los inputs **Representante legal** y **DNI del firmante** se solicitan **siempre** (los contactos no tienen campo DNI en HubSpot todavía) y viajan obligatorios como `legalRepresentative` y `dniLegalRepresentative`. El dropdown **País** (El Salvador, Costa Rica, Guatemala, Honduras, República Dominicana) es obligatorio y viaja como `country` (texto).
+3. Direcciones (custom object de HubSpot asociado a la Company): 0 → input de texto libre, 1+ → dropdown con todas las direcciones + opción "Otra (escribir manualmente)" que abre input de texto. Con 1 sola dirección viene preseleccionada. Al API se envía siempre el **texto** de la dirección en el campo `location`, nunca el id del registro.
+4. Usuario selecciona Template (+ Contacto si dropdown con contactos + Dirección) → click "Enviar".
+5. `POST /api/v1/docusign/envelopes` con `{ dealId, templateId, contactId?, location, country, legalRepresentative, dniLegalRepresentative }`.
 6. La card muestra estado lifecycle (active/signed/failed) con acciones correspondientes.
 
 ---
@@ -320,7 +320,7 @@ HubSpot exige HTTPS válido aquí — **no acepta `localhost`.** Por eso usamos 
 ```json
 {
   "proxy": {
-    "https://api.docusign-integration.local": "http://localhost:3000"
+    "https://api.docusign-integration.local": "http://localhost:3002"
   }
 }
 ```
@@ -347,11 +347,13 @@ hubspot.extend<'crm.record.tab'>(({ context }) => {
 **Implementado (rama `v2-grupo-inve-ui`):**
 - ✅ Lista templates con `<Select>`
 - ✅ Jurídico auto (banner) vs dropdown (ContactSelector) vs error (alert rojo bloqueante)
-- ✅ Direcciones: 0→oculto, 1→auto, 2+→dropdown
+- ✅ Direcciones: 0→input texto libre, 1+→dropdown + opción "Otra (escribir manualmente)"; se envía el texto como `location`
+- ✅ Inputs "Representante legal" y "DNI del firmante" siempre visibles y obligatorios → `legalRepresentative` / `dniLegalRepresentative`
+- ✅ Dropdown "País" obligatorio (5 países CA/Caribe) → `country` (texto)
 - ✅ `fetchSendContext` reemplaza `fetchTemplates` + `fetchContacts`
 - ✅ Vistas lifecycle: ACTIVE (sent/signing) con "Cancelar" + "Refrescar", SIGNED con "Ver PDF" + "Nuevo contrato", FAILED con "Nuevo contrato"
 - ✅ Modal de cancelación (razón obligatoria min 5 chars)
-- ✅ `sendEnvelope` con `directionId` opcional
+- ✅ `sendEnvelope` con `location` (texto) + `contactId`/`legalRepresentative` según haya contacto o no
 - ✅ Solo castellano hardcoded
 
 **Pendiente (Plan 12 restante):**

@@ -2,13 +2,14 @@ import { hubspot } from '@hubspot/ui-extensions';
 import type { SendContext, SendEnvelopeResult, EnvelopeStatus } from '../types.js';
 
 /**
- * Dummy HTTPS URL that the HubSpot CLI proxies to http://localhost:3000 in dev
+ * Dummy HTTPS URL that the HubSpot CLI proxies to http://localhost:3002 in dev
  * (via local.json in src/app/). In production this constant is replaced with
  * the real backend domain.
  *
  * MUST stay listed in app-hsmeta.json's permittedUrls.fetch.
  */
-const API_BASE = 'https://api.docusign-integration.local';
+//const API_BASE = 'https://api.docusign-integration.local';
+const API_BASE = 'https://smartds.smarteamcr.com';
 
 interface BackendErrorBody {
   error?: string;
@@ -46,8 +47,16 @@ export async function fetchSendContext(dealId: string): Promise<SendContext> {
 export async function sendEnvelope(input: {
   dealId: string;
   templateId: string;
-  contactId: string;
-  directionId?: string;
+  /** Omitted when the Deal has no associated contact with email. */
+  contactId?: string;
+  /** Location text as it should appear in the document (never a HubSpot record id). */
+  location: string;
+  /** Country text selected in the card's dropdown. */
+  country: string;
+  /** Always required: typed by the seller in the card. */
+  legalRepresentative: string;
+  /** Always required: contacts don't have a DNI field in HubSpot yet, so the seller types it. */
+  dniLegalRepresentative: string;
 }): Promise<SendEnvelopeResult> {
   const res = await hubspot.fetch(`${API_BASE}/api/v1/docusign/envelopes`, {
     method: 'POST',

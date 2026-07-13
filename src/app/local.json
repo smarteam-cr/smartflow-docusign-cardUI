@@ -1,5 +1,5 @@
 {
   "proxy": {
-    "https://api.docusign-integration.local": "http://localhost:3000"
+    "https://api.docusign-integration.local": "http://localhost:3002"
   }
 }

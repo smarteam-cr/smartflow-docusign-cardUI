@@ -20,7 +20,8 @@
     "permittedUrls": {
       "fetch": [
         "https://api.hubapi.com",
-        "https://api.docusign-integration.local"
+        "https://api.docusign-integration.local",
+        "https://smartds.smarteamcr.com"
       ],
       "iframe": [],
       "img": []

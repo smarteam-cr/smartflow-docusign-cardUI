@@ -63,6 +63,21 @@ export interface EnvelopeStatus {
  *      ▼
  *   loadError
  */
+/**
+ * Sentinel value for `selectedDirectionId` meaning the seller chose to type
+ * the location manually instead of picking one of the company's direcciones.
+ */
+export const CUSTOM_LOCATION = '__custom__';
+
+/** Countries offered in the "País" dropdown; the selected text travels to the API as `country`. */
+export const COUNTRIES = [
+  'El Salvador',
+  'Costa Rica',
+  'Guatemala',
+  'Honduras',
+  'República Dominicana',
+] as const;
+
 export type UiState =
   | { kind: 'loading' }
   | {
@@ -71,21 +86,33 @@ export type UiState =
       selectedTemplateId: string | null;
       selectedContactId: string | null;
       selectedDirectionId: string | null;
+      selectedCountry: string | null;
+      customLocation: string;
+      legalRepresentative: string;
+      dniLegalRepresentative: string;
     }
   | { kind: 'loadError'; message: string }
   | {
       kind: 'sending';
       sendContext: SendContext;
       selectedTemplateId: string;
-      selectedContactId: string;
+      selectedContactId: string | null;
       selectedDirectionId: string | null;
+      selectedCountry: string | null;
+      customLocation: string;
+      legalRepresentative: string;
+      dniLegalRepresentative: string;
     }
   | {
       kind: 'sendError';
       sendContext: SendContext;
       selectedTemplateId: string;
-      selectedContactId: string;
+      selectedContactId: string | null;
       selectedDirectionId: string | null;
+      selectedCountry: string | null;
+      customLocation: string;
+      legalRepresentative: string;
+      dniLegalRepresentative: string;
       message: string;
     }
   | {

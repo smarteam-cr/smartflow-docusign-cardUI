@@ -31,3 +31,6 @@ Use `hs project add` to interactively add new features to your project, or check
 - [HubSpot Developer Documentation](https://developers.hubspot.com/docs)
 - [Developer Community Slack](https://developers.hubspot.com/slack)
 - [HubSpot CLI Documentation](https://developers.hubspot.com/docs/developer-tooling/local-development/hubspot-cli/install-the-cli)
+
+### command testing
+- hs project dev --project-account 49075644 --testing-account 49075644

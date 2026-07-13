@@ -156,7 +156,7 @@ IMPORTANT: IF THE 'HubSpotDev' MCP SERVER IS INSTALLED USE THE TOOLS BEFORE TRYI
 - `hs create template <name>` - Create a new template
 - `hs create module <name>` - Create a new module
 - `hs create function <name>` - Create a new serverless function
-- `hs theme preview` - Preview a theme locally at https://hslocal.net:3000/
+- `hs theme preview` - Preview a theme locally at https://hslocal.net:3002/
 
 ### Sandbox Management
 - `hs sandbox create` - Create a development sandbox account
