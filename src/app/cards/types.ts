@@ -78,6 +78,12 @@ export const COUNTRIES = [
   'República Dominicana',
 ] as const;
 
+/** Options offered in the "Acuerdo" dropdown; the selected text travels to the API as `commercialAgreement`. */
+export const AGREEMENTS = [
+  'Acta de representación legal',
+  'Acta de nombramiento',
+] as const;
+
 export type UiState =
   | { kind: 'loading' }
   | {
@@ -87,6 +93,7 @@ export type UiState =
       selectedContactId: string | null;
       selectedDirectionId: string | null;
       selectedCountry: string | null;
+      selectedAgreement: string | null;
       customLocation: string;
       legalRepresentative: string;
       dniLegalRepresentative: string;
@@ -99,6 +106,7 @@ export type UiState =
       selectedContactId: string | null;
       selectedDirectionId: string | null;
       selectedCountry: string | null;
+      selectedAgreement: string | null;
       customLocation: string;
       legalRepresentative: string;
       dniLegalRepresentative: string;
@@ -110,6 +118,7 @@ export type UiState =
       selectedContactId: string | null;
       selectedDirectionId: string | null;
       selectedCountry: string | null;
+      selectedAgreement: string | null;
       customLocation: string;
       legalRepresentative: string;
       dniLegalRepresentative: string;

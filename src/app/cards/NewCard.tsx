@@ -5,7 +5,7 @@ import { TemplateSelector } from './components/TemplateSelector.js';
 import { ContactSelector } from './components/ContactSelector.js';
 import { SendButton } from './components/SendButton.js';
 import { StatusMessage } from './components/StatusMessage.js';
-import { CUSTOM_LOCATION, COUNTRIES } from './types.js';
+import { CUSTOM_LOCATION, COUNTRIES, AGREEMENTS } from './types.js';
 import type { UiState, SendContext, EnvelopeStatus } from './types.js';
 
 type ReadyState = Extract<UiState, { kind: 'ready' }>;
@@ -34,6 +34,7 @@ function initialReady(sendContext: SendContext): UiState {
     selectedContactId: null,
     selectedDirectionId: sendContext.direcciones.length === 1 ? sendContext.direcciones[0].id : null,
     selectedCountry: null,
+    selectedAgreement: null,
     customLocation: '',
     legalRepresentative: '',
     dniLegalRepresentative: '',
@@ -130,6 +131,7 @@ const Extension: React.FC<ExtensionProps> = ({ context, actions }) => {
         selectedContactId: state.selectedContactId,
         selectedDirectionId: state.selectedDirectionId,
         selectedCountry: state.selectedCountry,
+        selectedAgreement: state.selectedAgreement,
         customLocation: state.customLocation,
         legalRepresentative: state.legalRepresentative,
         dniLegalRepresentative: state.dniLegalRepresentative,
@@ -158,7 +160,10 @@ const Extension: React.FC<ExtensionProps> = ({ context, actions }) => {
     const country = state.selectedCountry;
     if (!country) return;
 
-    const { selectedTemplateId, selectedDirectionId, selectedCountry, customLocation } = state;
+    const commercialAgreement = state.selectedAgreement;
+    if (!commercialAgreement) return;
+
+    const { selectedTemplateId, selectedDirectionId, selectedCountry, selectedAgreement, customLocation } = state;
     setState({
       kind: 'sending',
       sendContext,
@@ -166,6 +171,7 @@ const Extension: React.FC<ExtensionProps> = ({ context, actions }) => {
       selectedContactId: noContacts ? null : contactId,
       selectedDirectionId,
       selectedCountry,
+      selectedAgreement,
       customLocation,
       legalRepresentative: state.legalRepresentative,
       dniLegalRepresentative: state.dniLegalRepresentative,
@@ -178,6 +184,7 @@ const Extension: React.FC<ExtensionProps> = ({ context, actions }) => {
         contactId: noContacts ? undefined : contactId!,
         location,
         country,
+        commercialAgreement,
         legalRepresentative,
         dniLegalRepresentative,
       });
@@ -197,6 +204,7 @@ const Extension: React.FC<ExtensionProps> = ({ context, actions }) => {
         selectedContactId: noContacts ? null : contactId,
         selectedDirectionId,
         selectedCountry,
+        selectedAgreement,
         customLocation,
         legalRepresentative: state.legalRepresentative,
         dniLegalRepresentative: state.dniLegalRepresentative,
@@ -336,6 +344,16 @@ const Extension: React.FC<ExtensionProps> = ({ context, actions }) => {
             readOnly={state.kind === 'sending'}
           />
 
+          <Select
+            label="Acuerdo"
+            name="agreement"
+            options={AGREEMENTS.map((a) => ({ label: a, value: a }))}
+            value={state.selectedAgreement ?? undefined}
+            placeholder="Seleccione un acuerdo"
+            onChange={(v: string | number | boolean) => updateForm({ selectedAgreement: String(v) })}
+            readOnly={state.kind === 'sending'}
+          />
+
           {state.sendContext.direcciones.length > 0 && (
             <Select
               label="Dirección"
@@ -380,6 +398,7 @@ const Extension: React.FC<ExtensionProps> = ({ context, actions }) => {
               (state.sendContext.clienteMode === 'dropdown' && !noContacts && !state.selectedContactId) ||
               resolveLocation(state) === '' ||
               !state.selectedCountry ||
+              !state.selectedAgreement ||
               state.legalRepresentative.trim() === '' ||
               state.dniLegalRepresentative.trim() === ''
             }
@@ -410,6 +429,7 @@ const Extension: React.FC<ExtensionProps> = ({ context, actions }) => {
                       {ctx.company && <Text>Empresa: {ctx.company.razonSocial} ({ctx.company.pais})</Text>}
                       {location && <Text>Dirección: {location}</Text>}
                       {state.selectedCountry && <Text>País: {state.selectedCountry}</Text>}
+                      {state.selectedAgreement && <Text>Acuerdo: {state.selectedAgreement}</Text>}
                       {cliente && <Text>Cliente: {cliente.firstName} {cliente.lastName} ({cliente.email})</Text>}
                       {state.legalRepresentative.trim() !== '' && (
                         <Text>Representante legal: {state.legalRepresentative}</Text>

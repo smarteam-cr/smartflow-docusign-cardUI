@@ -53,6 +53,8 @@ export async function sendEnvelope(input: {
   location: string;
   /** Country text selected in the card's dropdown. */
   country: string;
+  /** Agreement text selected in the card's "Acuerdo" dropdown (one of AGREEMENTS). */
+  commercialAgreement: string;
   /** Always required: typed by the seller in the card. */
   legalRepresentative: string;
   /** Always required: contacts don't have a DNI field in HubSpot yet, so the seller types it. */
