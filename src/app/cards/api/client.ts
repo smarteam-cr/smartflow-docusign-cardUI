@@ -8,8 +8,8 @@ import type { SendContext, SendEnvelopeResult, EnvelopeStatus } from '../types.j
  *
  * MUST stay listed in app-hsmeta.json's permittedUrls.fetch.
  */
-//const API_BASE = 'https://api.docusign-integration.local';
-const API_BASE = 'https://smartds.smarteamcr.com';
+const API_BASE = 'https://api.docusign-integration.local';
+//const API_BASE = 'https://smartds.smarteamcr.com';
 
 interface BackendErrorBody {
   error?: string;
@@ -27,9 +27,15 @@ async function extractErrorMessage(res: Response, fallback: string): Promise<str
   }
 }
 
-export async function fetchSendContext(dealId: string): Promise<SendContext> {
+/**
+ * @param userTeam Name of the card user's primary team ("Equipo predeterminado"),
+ * e.g. "Costa Rica". The backend uses it to filter the templates it returns.
+ * Sent as the `userTeam` query param; omitted when the user has no primary team.
+ */
+export async function fetchSendContext(dealId: string, userTeam: string): Promise<SendContext> {
+  const query = userTeam ? `?userTeam=${encodeURIComponent(userTeam)}` : '';
   const res = await hubspot.fetch(
-    `${API_BASE}/api/v1/deals/${encodeURIComponent(dealId)}/send-context`,
+    `${API_BASE}/api/v1/deals/${encodeURIComponent(dealId)}/send-context${query}`,
     { method: 'GET' }
   );
   if (!res.ok) {
@@ -49,9 +55,9 @@ export async function sendEnvelope(input: {
   templateId: string;
   /** The Deal contact with the "Responsable Jurídico" association label (the signer). */
   contactId: string;
-  /** Location text as it should appear in the document (never a HubSpot record id). */
+  /** The `direccion_fiscal` property of the Company associated to the Deal (text, from send-context). */
   location: string;
-  /** Country text selected in the card's dropdown. */
+  /** The Deal's `pais` property (text, from send-context). */
   country: string;
   /** Agreement text selected in the card's "Acuerdo" dropdown (one of AGREEMENTS). */
   commercialAgreement: string;

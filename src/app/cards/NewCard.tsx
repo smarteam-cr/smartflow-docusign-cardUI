@@ -4,11 +4,10 @@ import { fetchSendContext, sendEnvelope, fetchEnvelopeStatus, voidEnvelope } fro
 import { TemplateSelector } from './components/TemplateSelector.js';
 import { SendButton } from './components/SendButton.js';
 import { StatusMessage } from './components/StatusMessage.js';
-import { CUSTOM_LOCATION, COUNTRIES, AGREEMENTS } from './types.js';
+import { AGREEMENTS } from './types.js';
 import type { UiState, SendContext, EnvelopeStatus, Contact } from './types.js';
 
 type ReadyState = Extract<UiState, { kind: 'ready' }>;
-type FormState = Extract<UiState, { kind: 'ready' | 'sending' | 'sendError' }>;
 type FormPatch = Partial<Omit<ReadyState, 'kind' | 'sendContext'>>;
 
 /**
@@ -21,13 +20,14 @@ function fullName(contact: Contact): string {
   return `${contact.firstName} ${contact.lastName}`.trim();
 }
 
-/** Location text to send to the API: the chosen dirección's text, or the manually typed one. */
-function resolveLocation(state: FormState): string {
-  const { direcciones } = state.sendContext;
-  if (direcciones.length === 0 || state.selectedDirectionId === CUSTOM_LOCATION) {
-    return state.customLocation.trim();
-  }
-  return direcciones.find((d) => d.id === state.selectedDirectionId)?.direction ?? '';
+/** Location sent to the API: the `direccion_fiscal` property of the Deal's Company, provided by the backend. */
+function resolveLocation(ctx: SendContext): string {
+  return (ctx.direccionFiscal ?? '').trim();
+}
+
+/** Country sent to the API: the Deal's `pais` property, provided by the backend. */
+function resolveCountry(ctx: SendContext): string {
+  return (ctx.pais ?? '').trim();
 }
 
 function initialReady(sendContext: SendContext): UiState {
@@ -37,10 +37,7 @@ function initialReady(sendContext: SendContext): UiState {
     sendContext,
     selectedTemplateId: null,
     selectedContactId: juridico?.id ?? null,
-    selectedDirectionId: sendContext.direcciones.length === 1 ? sendContext.direcciones[0].id : null,
-    selectedCountry: null,
     selectedAgreement: null,
-    customLocation: '',
     dniLegalRepresentative: '',
   };
 }
@@ -71,6 +68,10 @@ interface ExtensionProps {
     crm: {
       objectId: string | number;
     };
+    /** The logged-in user; by client rule this is always the Deal owner. */
+    user?: {
+      teams?: Array<{ id: string | number; name: string; primary?: boolean }>;
+    };
   };
   actions: {
     closeOverlay: (id: string) => void;
@@ -79,6 +80,8 @@ interface ExtensionProps {
 
 const Extension: React.FC<ExtensionProps> = ({ context, actions }) => {
   const dealId = String(context.crm.objectId);
+  /** "Equipo predeterminado" of the card user; the backend filters templates by it. */
+  const userTeam = context.user?.teams?.find((t) => t.primary)?.name?.trim() ?? '';
   const [state, setState] = useState<UiState>({ kind: 'loading' });
   const [confirmTriggered, setConfirmTriggered] = useState(false);
   /** Set when the seller clicks "Enviar" without exactly one "Responsable Jurídico" contact. */
@@ -95,7 +98,7 @@ const Extension: React.FC<ExtensionProps> = ({ context, actions }) => {
   const loadAll = (): void => {
     setSignerError(null);
     setState({ kind: 'loading' });
-    Promise.all([fetchSendContext(dealId), fetchEnvelopeStatus(dealId)])
+    Promise.all([fetchSendContext(dealId, userTeam), fetchEnvelopeStatus(dealId)])
       .then(([sendContext, envelopeStatus]) => {
         setState(resolveInitialState(sendContext, envelopeStatus, dealId));
       })
@@ -105,14 +108,14 @@ const Extension: React.FC<ExtensionProps> = ({ context, actions }) => {
   const loadForNewContract = (): void => {
     setSignerError(null);
     setState({ kind: 'loading' });
-    fetchSendContext(dealId)
+    fetchSendContext(dealId, userTeam)
       .then((sendContext) => setState(initialReady(sendContext)))
       .catch((err: Error) => setState({ kind: 'loadError', message: err.message }));
   };
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([fetchSendContext(dealId), fetchEnvelopeStatus(dealId)])
+    Promise.all([fetchSendContext(dealId, userTeam), fetchEnvelopeStatus(dealId)])
       .then(([sendContext, envelopeStatus]) => {
         if (cancelled) return;
         setState(resolveInitialState(sendContext, envelopeStatus, dealId));
@@ -123,7 +126,7 @@ const Extension: React.FC<ExtensionProps> = ({ context, actions }) => {
     return () => {
       cancelled = true;
     };
-  }, [dealId]);
+  }, [dealId, userTeam]);
 
   /** Applies a form change; if we were in sendError, editing any field returns us to ready. */
   const updateForm = (patch: FormPatch): void => {
@@ -137,10 +140,7 @@ const Extension: React.FC<ExtensionProps> = ({ context, actions }) => {
         sendContext: state.sendContext,
         selectedTemplateId: state.selectedTemplateId,
         selectedContactId: state.selectedContactId,
-        selectedDirectionId: state.selectedDirectionId,
-        selectedCountry: state.selectedCountry,
         selectedAgreement: state.selectedAgreement,
-        customLocation: state.customLocation,
         dniLegalRepresentative: state.dniLegalRepresentative,
         ...patch,
       });
@@ -154,29 +154,26 @@ const Extension: React.FC<ExtensionProps> = ({ context, actions }) => {
     if (sendContext.clienteMode !== 'juridico' || !sendContext.juridicoContact) return;
     const contactId = sendContext.juridicoContact.id;
 
-    const location = resolveLocation(state);
+    const location = resolveLocation(sendContext);
     if (!location) return;
+
+    const country = resolveCountry(sendContext);
+    if (!country) return;
 
     const legalRepresentative = fullName(sendContext.juridicoContact) || sendContext.juridicoContact.email;
     const dniLegalRepresentative = state.dniLegalRepresentative.trim();
     if (!legalRepresentative || !dniLegalRepresentative) return;
 
-    const country = state.selectedCountry;
-    if (!country) return;
-
     const commercialAgreement = state.selectedAgreement;
     if (!commercialAgreement) return;
 
-    const { selectedTemplateId, selectedDirectionId, selectedCountry, selectedAgreement, customLocation } = state;
+    const { selectedTemplateId, selectedAgreement } = state;
     setState({
       kind: 'sending',
       sendContext,
       selectedTemplateId,
       selectedContactId: contactId,
-      selectedDirectionId,
-      selectedCountry,
       selectedAgreement,
-      customLocation,
       dniLegalRepresentative: state.dniLegalRepresentative,
     });
 
@@ -205,10 +202,7 @@ const Extension: React.FC<ExtensionProps> = ({ context, actions }) => {
         sendContext,
         selectedTemplateId,
         selectedContactId: contactId,
-        selectedDirectionId,
-        selectedCountry,
         selectedAgreement,
-        customLocation,
         dniLegalRepresentative: state.dniLegalRepresentative,
         message,
       });
@@ -282,6 +276,18 @@ const Extension: React.FC<ExtensionProps> = ({ context, actions }) => {
             </StatusMessage>
           )}
 
+          {resolveLocation(state.sendContext) === '' && (
+            <StatusMessage variant="warning" title="Falta la dirección fiscal">
+              <Text>La Empresa asociada al negocio no tiene la propiedad "Dirección fiscal" (direccion_fiscal). Llénala en HubSpot para poder enviar.</Text>
+            </StatusMessage>
+          )}
+
+          {resolveCountry(state.sendContext) === '' && (
+            <StatusMessage variant="warning" title="Falta el país">
+              <Text>El negocio no tiene la propiedad "País" (pais). Llénala en HubSpot para poder enviar.</Text>
+            </StatusMessage>
+          )}
+
           <Text>Selecciona el documento:</Text>
 
           <TemplateSelector
@@ -292,21 +298,11 @@ const Extension: React.FC<ExtensionProps> = ({ context, actions }) => {
           />
 
           <Input
-            label="DNI del firmante"
+            label="Número de identificación"
             name="dni-legal-representative"
             value={state.dniLegalRepresentative}
-            placeholder="Documento de identidad"
+            placeholder="Número de identificación del firmante"
             onChange={(v) => updateForm({ dniLegalRepresentative: String(v) })}
-            readOnly={state.kind === 'sending'}
-          />
-
-          <Select
-            label="País"
-            name="country"
-            options={COUNTRIES.map((c) => ({ label: c, value: c }))}
-            value={state.selectedCountry ?? undefined}
-            placeholder="Seleccione un país"
-            onChange={(v: string | number | boolean) => updateForm({ selectedCountry: String(v) })}
             readOnly={state.kind === 'sending'}
           />
 
@@ -319,32 +315,6 @@ const Extension: React.FC<ExtensionProps> = ({ context, actions }) => {
             onChange={(v: string | number | boolean) => updateForm({ selectedAgreement: String(v) })}
             readOnly={state.kind === 'sending'}
           />
-
-          {state.sendContext.direcciones.length > 0 && (
-            <Select
-              label="Dirección"
-              name="location"
-              options={[
-                ...state.sendContext.direcciones.map((d) => ({ label: d.direction, value: d.id })),
-                { label: 'Otra (escribir manualmente)', value: CUSTOM_LOCATION },
-              ]}
-              value={state.selectedDirectionId ?? undefined}
-              placeholder="Seleccione una dirección"
-              onChange={(v: string | number | boolean) => updateForm({ selectedDirectionId: String(v) })}
-              readOnly={state.kind === 'sending'}
-            />
-          )}
-
-          {(state.sendContext.direcciones.length === 0 || state.selectedDirectionId === CUSTOM_LOCATION) && (
-            <Input
-              label={state.sendContext.direcciones.length === 0 ? 'Dirección' : 'Dirección (manual)'}
-              name="custom-location"
-              value={state.customLocation}
-              placeholder="Escriba la dirección"
-              onChange={(v) => updateForm({ customLocation: String(v) })}
-              readOnly={state.kind === 'sending'}
-            />
-          )}
 
           {state.sendContext.company && (
             <Text>Empresa: {state.sendContext.company.razonSocial}</Text>
@@ -360,8 +330,6 @@ const Extension: React.FC<ExtensionProps> = ({ context, actions }) => {
               state.kind === 'sending' ||
               state.sendContext.templates.length === 0 ||
               !state.selectedTemplateId ||
-              resolveLocation(state) === '' ||
-              !state.selectedCountry ||
               !state.selectedAgreement ||
               state.dniLegalRepresentative.trim() === ''
             }
@@ -371,15 +339,25 @@ const Extension: React.FC<ExtensionProps> = ({ context, actions }) => {
                 setSignerError('El Deal tiene más de un contacto con la etiqueta "Responsable Jurídico". Deja la etiqueta en un solo contacto en HubSpot y vuelve a comprobar.');
               } else if (state.sendContext.clienteMode !== 'juridico' || !state.sendContext.juridicoContact) {
                 setSignerError('Ningún contacto asociado al Deal tiene la etiqueta "Responsable Jurídico". Asígnala a exactamente un contacto en HubSpot (Contactos → ⋯ → Editar etiquetas de asociación) y vuelve a comprobar.');
+              } else if (resolveLocation(state.sendContext) === '') {
+                setSignerError('La Empresa asociada al negocio no tiene la propiedad "Dirección fiscal" (direccion_fiscal). Llénala en HubSpot y vuelve a comprobar.');
+              } else if (resolveCountry(state.sendContext) === '') {
+                setSignerError('El negocio no tiene la propiedad "País" (pais). Llénala en HubSpot y vuelve a comprobar.');
               } else {
                 setSignerError(null);
               }
             }}
-            overlay={state.sendContext.clienteMode !== 'juridico' || !state.sendContext.juridicoContact ? undefined : (() => {
+            overlay={
+              state.sendContext.clienteMode !== 'juridico' ||
+              !state.sendContext.juridicoContact ||
+              resolveLocation(state.sendContext) === '' ||
+              resolveCountry(state.sendContext) === ''
+                ? undefined
+                : (() => {
               const ctx = state.sendContext;
               const tpl = ctx.templates.find(t => t.id === state.selectedTemplateId);
               const cliente = ctx.clienteMode === 'juridico' ? ctx.juridicoContact : null;
-              const location = resolveLocation(state);
+              const location = resolveLocation(ctx);
 
               return (
                 <Modal
@@ -396,15 +374,15 @@ const Extension: React.FC<ExtensionProps> = ({ context, actions }) => {
                     <Flex direction="column" gap="small">
                       {tpl && <Text format={{ fontWeight: 'bold' }}>Documento: {tpl.name}</Text>}
                       {ctx.company && <Text>Empresa: {ctx.company.razonSocial} ({ctx.company.pais})</Text>}
-                      {location && <Text>Dirección: {location}</Text>}
-                      {state.selectedCountry && <Text>País: {state.selectedCountry}</Text>}
+                      {location && <Text>Dirección fiscal: {location}</Text>}
+                      {resolveCountry(ctx) && <Text>País: {resolveCountry(ctx)}</Text>}
                       {state.selectedAgreement && <Text>Acuerdo: {state.selectedAgreement}</Text>}
                       {cliente && <Text>Cliente: {cliente.firstName} {cliente.lastName} ({cliente.email})</Text>}
                       {cliente && (
                         <Text>Representante legal: {fullName(cliente) || cliente.email}</Text>
                       )}
                       {state.dniLegalRepresentative.trim() !== '' && (
-                        <Text>DNI del firmante: {state.dniLegalRepresentative}</Text>
+                        <Text>Número de identificación: {state.dniLegalRepresentative}</Text>
                       )}
                       {ctx.hasQuote && <Text>✓ Cotización vinculada</Text>}
                       {ctx.capexCount > 0 && <Text>✓ {ctx.capexCount} capex incluidos</Text>}

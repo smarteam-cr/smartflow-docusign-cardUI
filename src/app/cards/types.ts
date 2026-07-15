@@ -14,11 +14,6 @@ export interface Contact {
   docIdentificacion: string;
 }
 
-export interface Direccion {
-  id: string;
-  direction: string;
-}
-
 export interface Company {
   razonSocial: string;
   pais: string;
@@ -28,7 +23,10 @@ export interface SendContext {
   clienteMode: 'juridico' | 'dropdown' | 'multiple_juridicos_error';
   juridicoContact: Contact | null;
   contacts: Contact[];
-  direcciones: Direccion[];
+  /** Property `direccion_fiscal` of the Company associated to the Deal; sent to the API as `location`. */
+  direccionFiscal: string | null;
+  /** Deal property `pais`; sent to the API as `country`. */
+  pais: string | null;
   templates: Template[];
   company: Company | null;
   capexCount: number;
@@ -63,21 +61,6 @@ export interface EnvelopeStatus {
  *      ▼
  *   loadError
  */
-/**
- * Sentinel value for `selectedDirectionId` meaning the seller chose to type
- * the location manually instead of picking one of the company's direcciones.
- */
-export const CUSTOM_LOCATION = '__custom__';
-
-/** Countries offered in the "País" dropdown; the selected text travels to the API as `country`. */
-export const COUNTRIES = [
-  'El Salvador',
-  'Costa Rica',
-  'Guatemala',
-  'Honduras',
-  'República Dominicana',
-] as const;
-
 /** Options offered in the "Acuerdo" dropdown; the selected text travels to the API as `commercialAgreement`. */
 export const AGREEMENTS = [
   'Acta de representación legal',
@@ -91,10 +74,7 @@ export type UiState =
       sendContext: SendContext;
       selectedTemplateId: string | null;
       selectedContactId: string | null;
-      selectedDirectionId: string | null;
-      selectedCountry: string | null;
       selectedAgreement: string | null;
-      customLocation: string;
       dniLegalRepresentative: string;
     }
   | { kind: 'loadError'; message: string }
@@ -103,10 +83,7 @@ export type UiState =
       sendContext: SendContext;
       selectedTemplateId: string;
       selectedContactId: string | null;
-      selectedDirectionId: string | null;
-      selectedCountry: string | null;
       selectedAgreement: string | null;
-      customLocation: string;
       dniLegalRepresentative: string;
     }
   | {
@@ -114,10 +91,7 @@ export type UiState =
       sendContext: SendContext;
       selectedTemplateId: string;
       selectedContactId: string | null;
-      selectedDirectionId: string | null;
-      selectedCountry: string | null;
       selectedAgreement: string | null;
-      customLocation: string;
       dniLegalRepresentative: string;
       message: string;
     }
