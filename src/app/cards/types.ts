@@ -78,6 +78,7 @@ export type UiState =
       selectedContactId: string | null;
       selectedAgreement: string | null;
       dniLegalRepresentative: string;
+      exclusiveUse: string;
     }
   | { kind: 'loadError'; message: string }
   | {
@@ -87,6 +88,7 @@ export type UiState =
       selectedContactId: string | null;
       selectedAgreement: string | null;
       dniLegalRepresentative: string;
+      exclusiveUse: string;
     }
   | {
       kind: 'sendError';
@@ -95,6 +97,7 @@ export type UiState =
       selectedContactId: string | null;
       selectedAgreement: string | null;
       dniLegalRepresentative: string;
+      exclusiveUse: string;
       message: string;
     }
   | {

@@ -8,8 +8,8 @@ import type { SendContext, SendEnvelopeResult, EnvelopeStatus } from '../types.j
  *
  * MUST stay listed in app-hsmeta.json's permittedUrls.fetch.
  */
-const API_BASE = 'https://api.docusign-integration.local';
-//const API_BASE = 'https://smartds.smarteamcr.com';
+//const API_BASE = 'https://api.docusign-integration.local';
+const API_BASE = 'https://smartds.smarteamcr.com';
 
 interface BackendErrorBody {
   error?: string;
@@ -67,6 +67,8 @@ export async function sendEnvelope(input: {
   legalRepresentative: string;
   /** Always required: contacts don't have a DNI field in HubSpot yet, so the seller types it. */
   dniLegalRepresentative: string;
+  /** Exclusive-use clause typed by the seller, e.g. "Para uso exclusivo <marca>, <producto>, <nombre>". */
+  exclusiveUse: string;
 }): Promise<SendEnvelopeResult> {
   const res = await hubspot.fetch(`${API_BASE}/api/v1/docusign/envelopes`, {
     method: 'POST',

@@ -47,6 +47,7 @@ function initialReady(sendContext: SendContext): UiState {
     selectedContactId: juridico?.id ?? null,
     selectedAgreement: null,
     dniLegalRepresentative: '',
+    exclusiveUse: '',
   };
 }
 
@@ -155,6 +156,7 @@ const Extension: React.FC<ExtensionProps> = ({ context, actions }) => {
         selectedContactId: state.selectedContactId,
         selectedAgreement: state.selectedAgreement,
         dniLegalRepresentative: state.dniLegalRepresentative,
+        exclusiveUse: state.exclusiveUse,
         ...patch,
       });
     }
@@ -180,6 +182,9 @@ const Extension: React.FC<ExtensionProps> = ({ context, actions }) => {
     const commercialAgreement = state.selectedAgreement;
     if (!commercialAgreement) return;
 
+    const exclusiveUse = state.exclusiveUse.trim();
+    if (!exclusiveUse) return;
+
     const { selectedTemplateId, selectedAgreement } = state;
     setState({
       kind: 'sending',
@@ -188,6 +193,7 @@ const Extension: React.FC<ExtensionProps> = ({ context, actions }) => {
       selectedContactId: contactId,
       selectedAgreement,
       dniLegalRepresentative: state.dniLegalRepresentative,
+      exclusiveUse: state.exclusiveUse,
     });
 
     try {
@@ -201,6 +207,7 @@ const Extension: React.FC<ExtensionProps> = ({ context, actions }) => {
         commercialAgreement,
         legalRepresentative,
         dniLegalRepresentative,
+        exclusiveUse,
       });
       setState({
         kind: 'active',
@@ -218,6 +225,7 @@ const Extension: React.FC<ExtensionProps> = ({ context, actions }) => {
         selectedContactId: contactId,
         selectedAgreement,
         dniLegalRepresentative: state.dniLegalRepresentative,
+        exclusiveUse: state.exclusiveUse,
         message,
       });
     }
@@ -308,6 +316,15 @@ const Extension: React.FC<ExtensionProps> = ({ context, actions }) => {
             readOnly={state.kind === 'sending'}
           />
 
+          <Input
+            label="Uso exclusivo"
+            name="exclusive-use"
+            value={state.exclusiveUse}
+            placeholder="Para uso exclusivo <marca>, <producto>, <nombre>"
+            onChange={(v) => updateForm({ exclusiveUse: String(v) })}
+            readOnly={state.kind === 'sending'}
+          />
+
           <Select
             label="Acuerdo"
             name="agreement"
@@ -333,7 +350,8 @@ const Extension: React.FC<ExtensionProps> = ({ context, actions }) => {
               state.sendContext.templates.length === 0 ||
               !state.selectedTemplateId ||
               !state.selectedAgreement ||
-              state.dniLegalRepresentative.trim() === ''
+              state.dniLegalRepresentative.trim() === '' ||
+              state.exclusiveUse.trim() === ''
             }
             loading={state.kind === 'sending'}
             onClick={() => {
@@ -385,6 +403,9 @@ const Extension: React.FC<ExtensionProps> = ({ context, actions }) => {
                       )}
                       {state.dniLegalRepresentative.trim() !== '' && (
                         <Text>Número de identificación: {state.dniLegalRepresentative}</Text>
+                      )}
+                      {state.exclusiveUse.trim() !== '' && (
+                        <Text>Uso exclusivo: {state.exclusiveUse}</Text>
                       )}
                       {ctx.hasQuote && <Text>✓ Cotización vinculada</Text>}
                       {ctx.capexCount > 0 && <Text>✓ {ctx.capexCount} capex incluidos</Text>}
