@@ -8,8 +8,8 @@ import type { SendContext, SendEnvelopeResult, EnvelopeStatus } from '../types.j
  *
  * MUST stay listed in app-hsmeta.json's permittedUrls.fetch.
  */
-//const API_BASE = 'https://api.docusign-integration.local';
-const API_BASE = 'https://smartds.smarteamcr.com';
+const API_BASE = 'https://api.docusign-integration.local';
+//const API_BASE = 'https://smartds.smarteamcr.com';
 
 interface BackendErrorBody {
   error?: string;
@@ -55,8 +55,10 @@ export async function sendEnvelope(input: {
   templateId: string;
   /** The Deal contact with the "Responsable Jurídico" association label (the signer). */
   contactId: string;
-  /** The `direccion_fiscal` property of the Company associated to the Deal (text, from send-context). */
+  /** Full country name (`fullLocation` from send-context; falls back to raw `pais` if absent). */
   location: string;
+  /** The `direccion_fiscal` property of the Company associated to the Deal (text, from send-context). */
+  direccionFiscal: string;
   /** The Deal's `pais` property (text, from send-context). */
   country: string;
   /** Agreement text selected in the card's "Acuerdo" dropdown (one of AGREEMENTS). */

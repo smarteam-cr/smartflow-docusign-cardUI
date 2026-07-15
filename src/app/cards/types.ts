@@ -25,8 +25,10 @@ export interface SendContext {
   contacts: Contact[];
   /** Property `direccion_fiscal` of the Company associated to the Deal; sent to the API as `location`. */
   direccionFiscal: string | null;
-  /** Deal property `pais`; sent to the API as `country`. */
+  /** Deal property `pais` (may be an internal value like "CR"); sent to the API as `country`. */
   pais: string | null;
+  /** Full country name (e.g. "Costa Rica") resolved by the backend; sent to the API as `location`. */
+  fullLocation: string | null;
   templates: Template[];
   company: Company | null;
   capexCount: number;

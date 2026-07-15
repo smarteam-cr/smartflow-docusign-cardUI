@@ -20,14 +20,22 @@ function fullName(contact: Contact): string {
   return `${contact.firstName} ${contact.lastName}`.trim();
 }
 
-/** Location sent to the API: the `direccion_fiscal` property of the Deal's Company, provided by the backend. */
-function resolveLocation(ctx: SendContext): string {
+/** Sent to the API as `direccionFiscal`: the `direccion_fiscal` property of the Deal's Company, provided by the backend. */
+function resolveDireccionFiscal(ctx: SendContext): string {
   return (ctx.direccionFiscal ?? '').trim();
 }
 
-/** Country sent to the API: the Deal's `pais` property, provided by the backend. */
+/** The Deal's `pais` property, provided by the backend. Sent to the API as `country`. */
 function resolveCountry(ctx: SendContext): string {
   return (ctx.pais ?? '').trim();
+}
+
+/**
+ * Full country name sent to the API as `location` (e.g. "Costa Rica" while
+ * `pais` may be "CR"). Falls back to `pais` if the backend didn't send it.
+ */
+function resolveFullLocation(ctx: SendContext): string {
+  return (ctx.fullLocation ?? '').trim() || resolveCountry(ctx);
 }
 
 function initialReady(sendContext: SendContext): UiState {
@@ -70,7 +78,8 @@ interface ExtensionProps {
     };
     /** The logged-in user; by client rule this is always the Deal owner. */
     user?: {
-      teams?: Array<{ id: string | number; name: string; primary?: boolean }>;
+      /** NOTE: the UI-extension context does NOT expose which team is the default one. */
+      teams?: Array<{ id: string | number; name: string }>;
     };
   };
   actions: {
@@ -80,8 +89,12 @@ interface ExtensionProps {
 
 const Extension: React.FC<ExtensionProps> = ({ context, actions }) => {
   const dealId = String(context.crm.objectId);
-  /** "Equipo predeterminado" of the card user; the backend filters templates by it. */
-  const userTeam = context.user?.teams?.find((t) => t.primary)?.name?.trim() ?? '';
+  /**
+   * Team of the card user; the backend filters templates by it. HubSpot's card
+   * context has no "default team" flag, so we take the first team — per client
+   * rule users belong to exactly one team (their country).
+   */
+  const userTeam = context.user?.teams?.[0]?.name?.trim() ?? '';
   const [state, setState] = useState<UiState>({ kind: 'loading' });
   const [confirmTriggered, setConfirmTriggered] = useState(false);
   /** Set when the seller clicks "Enviar" without exactly one "Responsable Jurídico" contact. */
@@ -154,8 +167,8 @@ const Extension: React.FC<ExtensionProps> = ({ context, actions }) => {
     if (sendContext.clienteMode !== 'juridico' || !sendContext.juridicoContact) return;
     const contactId = sendContext.juridicoContact.id;
 
-    const location = resolveLocation(sendContext);
-    if (!location) return;
+    const direccionFiscal = resolveDireccionFiscal(sendContext);
+    if (!direccionFiscal) return;
 
     const country = resolveCountry(sendContext);
     if (!country) return;
@@ -182,7 +195,8 @@ const Extension: React.FC<ExtensionProps> = ({ context, actions }) => {
         dealId,
         templateId: selectedTemplateId,
         contactId,
-        location,
+        location: resolveFullLocation(sendContext),
+        direccionFiscal,
         country,
         commercialAgreement,
         legalRepresentative,
@@ -327,7 +341,7 @@ const Extension: React.FC<ExtensionProps> = ({ context, actions }) => {
                 setSignerError('El Deal tiene más de un contacto con la etiqueta "Responsable Jurídico". Deja la etiqueta en un solo contacto en HubSpot y vuelve a comprobar.');
               } else if (state.sendContext.clienteMode !== 'juridico' || !state.sendContext.juridicoContact) {
                 setSignerError('Ningún contacto asociado al Deal tiene la etiqueta "Responsable Jurídico". Asígnala a exactamente un contacto en HubSpot (Contactos → ⋯ → Editar etiquetas de asociación) y vuelve a comprobar.');
-              } else if (resolveLocation(state.sendContext) === '') {
+              } else if (resolveDireccionFiscal(state.sendContext) === '') {
                 setSignerError('La Empresa asociada al negocio no tiene la propiedad "Dirección fiscal" (direccion_fiscal). Llénala en HubSpot y vuelve a comprobar.');
               } else if (resolveCountry(state.sendContext) === '') {
                 setSignerError('El negocio no tiene la propiedad "País" (pais). Llénala en HubSpot y vuelve a comprobar.');
@@ -338,14 +352,14 @@ const Extension: React.FC<ExtensionProps> = ({ context, actions }) => {
             overlay={
               state.sendContext.clienteMode !== 'juridico' ||
               !state.sendContext.juridicoContact ||
-              resolveLocation(state.sendContext) === '' ||
+              resolveDireccionFiscal(state.sendContext) === '' ||
               resolveCountry(state.sendContext) === ''
                 ? undefined
                 : (() => {
               const ctx = state.sendContext;
               const tpl = ctx.templates.find(t => t.id === state.selectedTemplateId);
               const cliente = ctx.clienteMode === 'juridico' ? ctx.juridicoContact : null;
-              const location = resolveLocation(ctx);
+              const direccionFiscal = resolveDireccionFiscal(ctx);
 
               return (
                 <Modal
@@ -362,8 +376,8 @@ const Extension: React.FC<ExtensionProps> = ({ context, actions }) => {
                     <Flex direction="column" gap="small">
                       {tpl && <Text format={{ fontWeight: 'bold' }}>Documento: {tpl.name}</Text>}
                       {ctx.company && <Text>Empresa: {ctx.company.razonSocial} ({ctx.company.pais})</Text>}
-                      {location && <Text>Dirección fiscal: {location}</Text>}
-                      {resolveCountry(ctx) && <Text>País: {resolveCountry(ctx)}</Text>}
+                      {direccionFiscal && <Text>Dirección fiscal: {direccionFiscal}</Text>}
+                      {resolveFullLocation(ctx) && <Text>País: {resolveFullLocation(ctx)}</Text>}
                       {state.selectedAgreement && <Text>Acuerdo: {state.selectedAgreement}</Text>}
                       {cliente && <Text>Cliente: {cliente.firstName} {cliente.lastName} ({cliente.email})</Text>}
                       {cliente && (
