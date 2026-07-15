@@ -8,8 +8,8 @@ import type { SendContext, SendEnvelopeResult, EnvelopeStatus } from '../types.j
  *
  * MUST stay listed in app-hsmeta.json's permittedUrls.fetch.
  */
-const API_BASE = 'https://api.docusign-integration.local';
-//const API_BASE = 'https://smartds.smarteamcr.com';
+//const API_BASE = 'https://api.docusign-integration.local';
+const API_BASE = 'https://smartds.smarteamcr.com';
 
 interface BackendErrorBody {
   error?: string;

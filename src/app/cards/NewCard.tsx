@@ -276,18 +276,6 @@ const Extension: React.FC<ExtensionProps> = ({ context, actions }) => {
             </StatusMessage>
           )}
 
-          {resolveLocation(state.sendContext) === '' && (
-            <StatusMessage variant="warning" title="Falta la dirección fiscal">
-              <Text>La Empresa asociada al negocio no tiene la propiedad "Dirección fiscal" (direccion_fiscal). Llénala en HubSpot para poder enviar.</Text>
-            </StatusMessage>
-          )}
-
-          {resolveCountry(state.sendContext) === '' && (
-            <StatusMessage variant="warning" title="Falta el país">
-              <Text>El negocio no tiene la propiedad "País" (pais). Llénala en HubSpot para poder enviar.</Text>
-            </StatusMessage>
-          )}
-
           <Text>Selecciona el documento:</Text>
 
           <TemplateSelector
