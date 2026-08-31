@@ -47,6 +47,7 @@ npm install
 ### Configuración para desarrollo local
 La card no puede llamar a `localhost` directamente (HubSpot exige URLs HTTPS válidas). Se usa una **URL
 dummy** declarada en `permittedUrls.fetch` y un **proxy** que la redirige al backend local:
+prod  `"https://smartds.smarteamcr.com"` 
 
 1. `src/app/app-hsmeta.json` ya incluye en `permittedUrls.fetch`:
    `https://api.hubapi.com` y `https://api.docusign-integration.local`.
